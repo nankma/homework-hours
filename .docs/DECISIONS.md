@@ -82,3 +82,12 @@ Newest last. "Rejected" lists what was considered and why it lost.
   settings stay in `/etc` so sysupgrade backups carry them. Fallback to tmpfs if p3 is missing.
 - **Logs kept at most ~14 days**: AdGuard query log rotation every 7 days (two files), statistics
   14 days. Asked for by the user to keep disk use bounded.
+
+## 2026-10-10 License
+- **GPL-3.0-or-later plus dual licensing.** Anyone may build and run it themselves; the owner
+  also sells ready-made devices, installation services and commercial licenses. Contributions
+  need a contributor agreement so dual licensing stays possible.
+  Rejected: MIT (anyone could sell it closed), keeping it closed (no do-it-yourself use).
+- The app only talks to AdGuard Home over HTTP and to nftables via `nft`, so it is a separate
+  work from those GPL components; modifying them or writing kernel modules (e.g. for
+  OpenAppFilter) would bring GPL-2.0/3.0 obligations for that part.

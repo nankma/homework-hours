@@ -106,6 +106,7 @@ Planned: blocking known DoH resolvers, and trying [OpenAppFilter](https://github
 | [.docs/DATA-AND-API.md](.docs/DATA-AND-API.md) | Settings file schema and the app's HTTP API |
 | [.docs/DECISIONS.md](.docs/DECISIONS.md) | Decisions and the alternatives considered |
 | [firmware/README.md](firmware/README.md) | What each firmware file is and what to change |
+| [THIRD-PARTY.md](THIRD-PARTY.md) | Third-party components, their licenses, and what to do when distributing a device |
 | [.docs/RESUME.md](.docs/RESUME.md), [CLAUDE.md](CLAUDE.md) | Picking the work up again (also for AI coding agents) |
 
 ## Repository layout
@@ -118,9 +119,22 @@ Planned: blocking known DoH resolvers, and trying [OpenAppFilter](https://github
 
 ## Contributing
 
-This is a personal home project. Questions and ideas are welcome as issues. Before sending a
-change, run the tests: `bash app/build.sh` runs `go vet` and `go test` before building.
+Questions, bug reports and ideas are welcome as issues. Because the project is dual-licensed
+(see below), pull requests can only be merged under a contributor agreement that lets the
+maintainer also offer your change under the commercial license; please open an issue first.
+Before sending a change, run the tests: `bash app/build.sh` runs `go vet` and `go test`.
 
 ## License
 
-No license chosen yet: all rights reserved.
+Copyright © 2026 nankma.
+
+Homework Hours is free software under the [GNU General Public License v3.0 or later](LICENSE):
+you may use, study, modify and share it, including for your own home or for others, as long as
+what you distribute stays under the GPL with its source available.
+
+**Commercial options.** A license outside the GPL terms (for example for a closed product), a
+ready-to-use device, and setup or installation services are available from the maintainer;
+contact via GitHub.
+
+Third-party components (OpenWrt, AdGuard Home, OpenAppFilter, Raspberry Pi firmware…) keep
+their own licenses: see [THIRD-PARTY.md](THIRD-PARTY.md).
