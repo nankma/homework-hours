@@ -1,0 +1,75 @@
+#!/bin/sh
+# First-boot base config: CM4 as a transparent bridge (eth0 + eth1) on the home LAN. The home
+# router stays the only router/DHCP server. Idempotent: safe to re-run over SSH.
+
+# --- Adapt to your network (defaults = our home: Q1000K router on 192.168.0.0/24) ------------
+HOSTNAME='cm4-bridge'
+ZONENAME='America/Los_Angeles'
+TIMEZONE='PST8PDT,M3.2.0,M11.1.0'   # POSIX TZ string for ZONENAME
+LAN_ADDR='192.168.0.2/24'           # the CM4's own address: a free static IP outside the router's DHCP pool
+GATEWAY='192.168.0.1'               # the home router (gateway and DNS for the CM4 itself)
+SERVICE_ADDR='192.168.1.1/24'       # temporary address for a service cable to eth0 (OpenWrt's default);
+                                    # remove it after go-live, or set '' to skip it
+# ----------------------------------------------------------------------------------------------
+
+uci -q batch <<EOF
+set system.@system[0].hostname='$HOSTNAME'
+set system.@system[0].zonename='$ZONENAME'
+set system.@system[0].timezone='$TIMEZONE'
+commit system
+EOF
+
+br=$(uci show network | sed -n "s/^network\.\([^.]*\)\.name='br-lan'$/\1/p" | head -n1)
+uci -q delete "network.$br.ports"
+uci add_list "network.$br.ports=eth0"
+uci add_list "network.$br.ports=eth1"
+# Safety net against a loop if the hub gets cabled to both the router and the CM4.
+uci set "network.$br.stp=1"
+uci set "network.$br.forward_delay=4"
+
+uci -q batch <<EOF
+delete network.wan
+delete network.wan6
+delete network.lan.ipaddr
+add_list network.lan.ipaddr='$LAN_ADDR'
+set network.lan.gateway='$GATEWAY'
+delete network.lan.dns
+add_list network.lan.dns='$GATEWAY'
+delete network.lan.ip6assign
+set network.lan.delegate='0'
+commit network
+EOF
+if [ -n "$SERVICE_ADDR" ]; then
+	uci add_list network.lan.ipaddr="$SERVICE_ADDR"
+	uci commit network
+fi
+
+# Never act as a DHCP/RA server: the CM4 sits on the household LAN.
+uci -q batch <<'EOF'
+set dhcp.lan.ignore='1'
+set dhcp.lan.dhcpv4='disabled'
+set dhcp.lan.ra='disabled'
+set dhcp.lan.dhcpv6='disabled'
+set dhcp.lan.ndp='disabled'
+commit dhcp
+EOF
+/etc/init.d/odhcpd disable
+
+# Wi-Fi stays off; management goes through the bridge IP.
+uci -q get wireless.radio0 >/dev/null && {
+	uci set wireless.radio0.disabled='1'
+	uci commit wireless
+}
+
+# SSH by key only, but never lock yourself out: only when a public key is installed.
+if grep -qE '^(ssh|ecdsa)-[a-z0-9-]+ AAAA[A-Za-z0-9+/=]{60,}' /etc/dropbear/authorized_keys 2>/dev/null; then
+	uci -q batch <<'EOF'
+set dropbear.@dropbear[0].PasswordAuth='off'
+set dropbear.@dropbear[0].RootPasswordAuth='off'
+commit dropbear
+EOF
+else
+	logger -t cm4-bridge "no key in /etc/dropbear/authorized_keys: SSH password login left on"
+fi
+
+exit 0

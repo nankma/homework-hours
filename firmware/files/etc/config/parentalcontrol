@@ -1,0 +1,5 @@
+config dns 'dns'
+	option enabled '1'
+	option port '5353'
+	# Empty = redirect DNS for every wireless device; otherwise only these MACs
+	#list only_mac 'aa:bb:cc:dd:ee:ff'

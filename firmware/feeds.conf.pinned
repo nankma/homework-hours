@@ -1,0 +1,8 @@
+# feeds.conf pinned to the revisions the running CM4 image/packages were built from
+# OpenWrt main: e9a6e45556e66067f7359509a7866cdbb8fe3f29 (reboot-35679-ge9a6e45556)
+src-git packages https://git.openwrt.org/feed/packages.git^ec4ca5c917337e15a055d0550b6d409fedde033b
+src-git luci https://git.openwrt.org/project/luci.git^73adbd5e3a499e28fe7a59df1ff707e3ee7211c4
+src-git routing https://git.openwrt.org/feed/routing.git^b40e6284f9944b8f3dc2b0edd2319d0c74660fd5
+src-git telephony https://git.openwrt.org/feed/telephony.git^5d68d53c160a325ea9d03fce393e051573bcc736
+src-git video https://github.com/openwrt/video.git^a951381b6c58b9b1eb087f09c9a20cff4ffe8063
+src-git oaf https://github.com/destan19/OpenAppFilter.git^7fcf9e87dc75f7c28c74e09504a4efa0a2db3c92

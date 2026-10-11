@@ -1,0 +1,4 @@
+# Keep LF everywhere: these files are copied to OpenWrt and run there
+* text=auto eol=lf
+# iCalendar files use CRLF by standard; keep them byte-for-byte
+*.ics -text

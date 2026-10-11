@@ -1,0 +1,31 @@
+# Transparent DNS redirect for the wireless side (bridge port eth0) to AdGuard Home.
+# No br_netfilter on this kernel: the bridge table re-addresses DNS frames to the CM4
+# itself (marked), then the inet nat table redirects them to AdGuard's port.
+# Placeholders: @BRMAC@ (br-lan MAC), @SRC@ ("" or "ether saddr { ... } "), @PORT@.
+
+add table bridge pc_dns
+delete table bridge pc_dns
+add table inet pc_dns
+delete table inet pc_dns
+
+table bridge pc_dns {
+	chain pre {
+		type filter hook prerouting priority -300; policy accept;
+		iifname != "eth0" accept
+		# No IPv6 on this LAN; keep DNS on IPv4 so it can't skip AdGuard
+		@SRC@ether type ip6 meta l4proto { tcp, udp } th dport { 53, 853 } drop
+		# DNS-over-TLS bypass
+		@SRC@ether type ip tcp dport 853 drop
+		@SRC@ether type ip meta l4proto { tcp, udp } th dport 53 ether daddr != @BRMAC@ meta mark set 0x5353 meta pkttype set host ether daddr set @BRMAC@
+	}
+}
+
+table inet pc_dns {
+	chain pre {
+		type nat hook prerouting priority dstnat - 5; policy accept;
+		meta mark 0x5353 meta l4proto { tcp, udp } th dport 53 redirect to :@PORT@
+		# DNS sent straight to the CM4 (e.g. a device with manual DNS 192.168.0.2) also goes to
+		# AdGuard; the CM4's own dnsmasq stays reachable on 127.0.0.1 only
+		fib daddr type local meta l4proto { tcp, udp } th dport 53 redirect to :@PORT@
+	}
+}

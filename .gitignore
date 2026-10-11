@@ -1,0 +1,16 @@
+# Secrets and machine-specific files: never commit
+backups/
+firmware/files/etc/dropbear/authorized_keys
+CLAUDE.local.md
+.claude/
+
+# Build output
+app/bin/
+
+# Local-only material
+.docs/TODO.md
+/tools/
+/web/
+PROJECT-LOG.md
+MINECRAFT-SCREENTIME-PLAN.md
+CM4-DUAL-ETH-MINI Case/

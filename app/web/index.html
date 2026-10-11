@@ -1,0 +1,1235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b4c7e">
+<title>Homework Hours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of kid cards on phones, two on desktop; tabs on top; schedule = 7-day timeline bars */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --line: #d9dee7;
+  --fg: #1c2433;
+  --muted: #5d6779;
+  --accent: #2b4c7e;
+  --accent-soft: #e3eaf5;
+  --ok: #1f7a4d;
+  --ok-soft: #dff3e8;
+  --stop: #b3372f;
+  --stop-soft: #f9e2df;
+  --temp: #9a6200;
+  --temp-soft: #fdf0d5;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161f; --surface: #1a2130; --line: #2c3547; --fg: #e6eaf2; --muted: #9aa4b6;
+    --accent: #8fb0e6; --accent-soft: #23314a; --ok: #5fcf96; --ok-soft: #173426;
+    --stop: #f08a80; --stop-soft: #3d1f1d; --temp: #f0b84f; --temp-soft: #3a2c12; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161f; --surface: #1a2130; --line: #2c3547; --fg: #e6eaf2; --muted: #9aa4b6;
+  --accent: #8fb0e6; --accent-soft: #23314a; --ok: #5fcf96; --ok-soft: #173426;
+  --stop: #f08a80; --stop-soft: #3d1f1d; --temp: #f0b84f; --temp-soft: #3a2c12; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 20px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.2rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 700; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.who-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.save-state { color: var(--muted); }
+.save-state.bad { color: var(--stop); font-weight: 700; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.swatch[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 2px var(--surface); }
+.empty { display: grid; gap: 10px; justify-items: start; }
+.clock { font-family: var(--font-mono); color: var(--muted); font-size: 0.9rem; }
+.banner { background: var(--temp-soft); color: var(--fg); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; font-size: 0.85rem; }
+
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+nav.tabs button { font: inherit; background: none; border: 0; padding: 10px 14px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+nav.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 700; }
+
+button.btn, select, input { font: inherit; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.danger { color: var(--stop); }
+.btn:focus-visible, nav.tabs button:focus-visible, input:focus-visible, select:focus-visible, .row-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 8px; padding: 6px 8px; }
+
+.kids { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.kid { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.kid-head { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; color: var(--surface); flex: none; }
+.kid-head .devs { margin-left: auto; text-align: right; }
+.svc { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.svc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.svc-name { font-weight: 700; min-width: 72px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; font-weight: 700; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.ok { color: var(--ok); background: var(--ok-soft); }
+.pill.stop { color: var(--stop); background: var(--stop-soft); }
+.pill.temp { color: var(--temp); background: var(--temp-soft); }
+.why { font-size: 0.85rem; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; border: 0; background: var(--surface); color: var(--muted); padding: 6px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 700; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.timeline { display: grid; gap: 6px; }
+.tl-axis, .tl-row { display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; }
+.tl-ticks { position: relative; height: 16px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
+.tl-ticks span { position: absolute; transform: translateX(-50%); }
+.tl-ticks span:first-child { transform: none; }
+.tl-ticks span:last-child { transform: translateX(-100%); }
+.row-edit { font: inherit; text-align: left; border: 0; padding: 0; background: none; color: inherit; cursor: pointer; display: contents; }
+.tl-day { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+.tl-bar { position: relative; height: 26px; background: var(--stop-soft); border-radius: 6px; overflow: hidden; }
+.tl-bar .open { position: absolute; top: 0; bottom: 0; background: var(--ok); opacity: 0.85; border-radius: 4px; }
+.tl-bar .now { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--fg); }
+.tl-row.today .tl-day { color: var(--fg); font-weight: 700; }
+.tl-row.selected .tl-bar { outline: 2px solid var(--accent); outline-offset: 1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+
+.editor { display: grid; gap: 10px; background: var(--accent-soft); border-radius: 8px; padding: 12px; }
+.win { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+.scroll { overflow-x: auto; }
+.chip { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 0.8rem; background: var(--accent-soft); }
+.chip.warn { background: var(--temp-soft); color: var(--temp); font-weight: 700; }
+.chip.new { background: var(--stop-soft); color: var(--stop); font-weight: 700; }
+td.nowrap { white-space: nowrap; }
+.form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.form label { display: grid; gap: 2px; font-size: 0.8rem; color: var(--muted); }
+.list { display: grid; gap: 0; }
+.list > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: no-preference) { .toast { transition: opacity .2s; } }
+
+.always { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.85rem; }
+.always b { font-weight: 700; }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.members { display: flex; flex-wrap: wrap; gap: 6px; }
+.member { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 0.85rem; background: var(--bg); }
+.member .kind { font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
+.member button { font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; width: 22px; height: 22px; border-radius: 50%; line-height: 1; }
+.member button:hover { color: var(--stop); background: var(--stop-soft); }
+.policy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.policy-row .who { min-width: 48px; font-weight: 700; }
+.policy-row select { padding: 4px 6px; }
+.note { font-size: 0.85rem; color: var(--muted); margin: 0; }
+.types .tl-axis, .types .tl-row { grid-template-columns: minmax(96px, 150px) 1fr; }
+.types .tl-day { font-family: var(--font-body); font-size: 0.85rem; line-height: 1.2; }
+.types .tl-day .mono { color: var(--muted); margin-right: 4px; }
+button.btn:disabled { opacity: 0.4; cursor: default; }
+
+.rules { display: grid; gap: 12px; }
+.rule { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 12px; min-width: 0; }
+.rule.editing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.rule.fallback { background: var(--bg); border-style: dashed; }
+.rule-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.rule-n { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--fg); font-size: 0.8rem; flex: none; }
+.rule-acts { margin-left: auto; }
+.rule-what { display: grid; gap: 6px; font-size: 0.9rem; }
+.lbl { display: inline-block; min-width: 46px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+.rule .tl-axis, .rule .tl-row { grid-template-columns: 64px 1fr; }
+.tl-row.off .tl-day { color: var(--muted); }
+fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; display: grid; gap: 8px; min-width: 0; }
+legend { font-weight: 700; padding: 0 4px; }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 6px; font-size: 0.85rem; cursor: pointer; background: var(--bg); }
+.pick:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+.day-edit { display: grid; gap: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+.day-edit:last-child { border-bottom: 0; }
+.win-list { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding-left: 72px; }
+.win-list .win { gap: 4px; }
+@media (max-width: 520px) { .win-list { padding-left: 0; } }
+/* Phones: bigger touch targets, 16px inputs (stops iOS zooming on focus), fewer table columns */
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .wrap { padding-top: 12px; gap: 14px; }
+  h1 { font-size: 1.35rem; }
+  .btn { padding: 9px 14px; min-height: 40px; }
+  input, select { font-size: 16px; padding: 8px 10px; min-height: 40px; }
+  nav.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--bg); margin: 0 -16px; padding: 0 8px; }
+  nav.tabs button { padding: 12px 12px; }
+  .seg button { padding: 9px 14px; }
+  .kids, .groups { grid-template-columns: 1fr; }
+  .panel, .kid, .rule { padding: 14px 12px; }
+  .form { display: grid; grid-template-columns: 1fr; }
+  .form .btn { justify-self: start; }
+  th, td { padding: 8px 6px; }
+  /* Rule list: number, name and order only; the card below shows the details */
+  .rule-list th:nth-child(3), .rule-list td:nth-child(3), .rule-list th:nth-child(4), .rule-list td:nth-child(4),
+  .rule-list th:nth-child(5), .rule-list td:nth-child(5) { display: none; }
+  .rule-list .fallback-row td[colspan] { display: table-cell; }
+  /* Devices: hide the MAC column */
+  .devices th:nth-child(4), .devices td:nth-child(4) { display: none; }
+  .rule .tl-axis, .rule .tl-row { grid-template-columns: 44px 1fr; }
+  .who-bar { width: 100%; justify-content: space-between; }
+}
+.rule-list tbody tr.sel td { background: var(--accent-soft); }
+.rule-list tbody tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.rule-list .fallback-row td { color: var(--muted); border-bottom: 0; }
+.linkish { font: inherit; font-weight: 700; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.linkish:hover { text-decoration: underline; }
+.linkish:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nowrap { flex-wrap: nowrap; }
+.ex-form { display: grid; gap: 12px; }
+.favs { display: grid; gap: 8px; }
+.fav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.fav-text { flex: 1; min-width: 0; }
+fieldset.inline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; }
+fieldset.inline legend { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.pick:has(input[type="radio"]:checked) { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Homework Hours</h1>
+      <div class="muted small">Internet rules for the wireless network · CM4 bridge 192.168.0.2</div>
+    </div>
+    <div class="who-bar">
+      <span class="clock" id="clock"></span>
+      <span class="save-state small" id="savestate" role="status"></span>
+      <span class="muted small" id="me"></span>
+      <button class="btn" data-act="logout">Sign out</button>
+    </div>
+  </header>
+  <div class="banner" id="syncbanner" hidden></div>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const h = (hh, mm = 0) => hh * 60 + mm;
+
+// Services AdGuard Home can block by name (subset of its catalog, ids as in its API)
+let CATALOG = {
+  youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram", snapchat: "Snapchat", twitch: "Twitch",
+  discord: "Discord", reddit: "Reddit", facebook: "Facebook", netflix: "Netflix", roblox: "Roblox",
+  epic_games: "Epic Games (Fortnite)", steam: "Steam", minecraft: "Minecraft", twitter: "X (Twitter)",
+};
+
+// Page state: the saved settings (filled from the CM4 by load()) plus view-only fields
+const state = {
+  tab: "today",
+  schedKid: null, selRule: null, draft: null, kidForm: null,
+  version: 0, groups: [], kids: [], exceptions: [], favorites: [], devices: [], calendar: [],
+  district: { lastSync: "", lastAttempt: "", lastError: "", feed: [], notices: [], changed: {}, ignored: {} },
+  openDevice: null, showAllDevices: false, range: 1440, showSystem: false, renaming: null, activity: null, sync: null,
+};
+const KINDS = { any: "Any date", holiday: "District holidays", break: "School breaks", custom: "Custom dates" };
+const ENTRY_KINDS = { holiday: "Holiday", break: "Break", custom: "Custom" };
+
+// District "Holidays and Closures" entries come from the CM4 (state.district.feed: {date, to, note}),
+// refreshed daily from the district calendar. The server expands them the same way for
+// enforcement (districtBase in app/district.go); keep the two in step. Titles with "Break" are
+// breaks, the rest holidays; holidays inside a break are dropped; one entry per first day.
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoDay(d); };
+const districtName = (note) => note.replace(/^No school, /, "").replace(/, all district offices closed$/, "").replace(/^./, (c) => c.toUpperCase());
+function districtBase() {
+  const breaks = [], days = [];
+  for (const { date, to, note } of state.district.feed || []) {
+    const e = { id: "d" + date, name: districtName(note), from: date, to: to || date, kind: /break/i.test(note) ? "break" : "holiday", source: "district" };
+    (e.kind === "break" ? breaks : days).push(e);
+  }
+  const inBreak = (d) => breaks.some((b) => d.from >= b.from && d.from <= b.to);
+  const all = [...breaks, ...days.filter((d) => !inBreak(d))].sort((a, b) => a.from.localeCompare(b.from) || b.to.localeCompare(a.to));
+  return all.filter((e, i) => i === 0 || all[i - 1].id !== e.id);
+}
+function districtEntries() {
+  return districtBase().filter((e) => !state.district.ignored[e.id]).map((e) => {
+    const to = state.district.changed[e.id]?.to;
+    return to && to >= e.from ? { ...e, districtTo: e.to, to } : e;
+  });
+}
+// Parent edits whose district entry is gone (the district moved or removed it)
+function orphanEdits() {
+  const ids = new Set(districtBase().map((e) => e.id));
+  return [...new Set([...Object.keys(state.district.changed), ...Object.keys(state.district.ignored)])].filter((id) => !ids.has(id));
+}
+const whenText = (iso) => { const d = new Date(iso); return `${DAYS[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()} ${fmtDate(d)}`; };
+function districtNotices(full) {
+  const n = state.district.notices || [];
+  if (!n.length) return "";
+  if (!full) return `<div class="banner">The district calendar changed (${n.length} update${n.length > 1 ? "s" : ""}). <button class="btn" data-tab="days">See the Calendar tab</button></div>`;
+  return `<div class="banner"><b>The district calendar changed</b>
+    <ul class="small">${n.map((x) => `<li>${esc(x.text)} <span class="muted">(${whenText(x.at)})</span></li>`).join("")}</ul>
+    <button class="btn" data-act="dismissnotices">Got it</button></div>`;
+}
+const allEntries = () => [...districtEntries(), ...state.calendar].sort((a, b) => a.from.localeCompare(b.from));
+const entriesOn = (date) => { const day = isoDay(date); return allEntries().filter((e) => day >= e.from && day <= e.to); };
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const nowDate = () => new Date();
+const minsNow = () => { const d = nowDate(); return d.getHours() * 60 + d.getMinutes(); };
+const fmt = (m) => { m = ((m % 1440) + 1440) % 1440; let hh = Math.floor(m / 60), mm = m % 60; const ap = hh < 12 ? "AM" : "PM"; hh = hh % 12 || 12; return `${hh}:${String(mm).padStart(2, "0")} ${ap}`; };
+const fmtDate = (d) => fmt(d.getHours() * 60 + d.getMinutes());
+const toHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const fromHHMM = (s) => { const [a, b] = s.split(":").map(Number); return a * 60 + b; };
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const kidById = (id) => state.kids.find((k) => k.id === id);
+const groupById = (id) => state.groups.find((g) => g.id === id);
+const keyName = (key) => key === "internet" ? "Internet" : groupById(key)?.name ?? key;
+const memberLabel = (m) => m.kind === "service" ? CATALOG[m.id] ?? m.id : m.kind === "filter" ? m.label : m.id;
+const kidDevices = (kid) => state.devices.filter((d) => d.kid === kid.id);
+const online = (d) => d.online;
+const isNew = (d) => d.firstSeen > 0 && d.side === "wireless" && !d.kid && !d.name && !d.reviewed && d.lastSeen <= 10080;
+// A child's device with the same DHCP host name: likely the same device with a new address
+function lookalike(d) {
+  const h = (d.host || "").toLowerCase();
+  if (!h) return null;
+  return state.devices.find((x) => x !== d && x.kid && [x.host, x.name].some((n) => (n || "").toLowerCase() === h)) || null;
+}
+function newDevicesHint() {
+  const n = state.devices.filter(isNew).length;
+  return n ? `<div class="banner">${n} new device${n > 1 ? "s" : ""} joined the Wi-Fi. <button class="btn" data-tab="devices">Check the Devices tab</button></div>` : "";
+}
+const devName = (d) => d.name || d.host || "Unknown device";
+const ago = (m) => m <= 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+const RANGES = { 30: "30 min", 60: "1 hour", 120: "2 hours", 240: "4 hours", 1440: "1 day", 10080: "1 week" };
+// Background traffic the device makes on its own (connectivity checks, clocks, location, console services)
+const SYSTEM = ["captive.apple.com", "ls.apple.com", "time.apple.com", "ctest.cdn.nintendo.net", "npln.srv.nintendo.net",
+  "connectivitycheck.gstatic.com", "clients3.google.com", "msftconnecttest.com", "time.windows.com"];
+const isSystem = (domain) => SYSTEM.some((s) => under(domain, s));
+
+// Domains behind each catalog service (AdGuard ships the full lists; a few shown here)
+let SERVICE_DOMAINS = {
+  youtube: ["youtube.com", "googlevideo.com", "ytimg.com", "youtu.be"], tiktok: ["tiktok.com", "tiktokv.com", "tiktokcdn.com"],
+  instagram: ["instagram.com", "cdninstagram.com"], snapchat: ["snapchat.com"], twitch: ["twitch.tv"], discord: ["discord.com", "discord.gg"],
+  reddit: ["reddit.com", "redd.it"], facebook: ["facebook.com", "fbcdn.net"], netflix: ["netflix.com", "nflxvideo.net"],
+  roblox: ["roblox.com", "rbxcdn.com"], epic_games: ["epicgames.com", "fortnite.com"], steam: ["steampowered.com", "steamcommunity.com"],
+  minecraft: ["minecraft.net"], twitter: ["x.com", "twitter.com"],
+};
+const under = (domain, base) => domain === base || domain.endsWith("." + base);
+const baseDomain = (d) => d.split(".").slice(-2).join(".");
+// A website added by hand wins over a catalog service that also covers it
+function groupOfDomain(domain) {
+  for (const g of state.groups) for (const m of g.members)
+    if (m.kind === "site" && under(domain, m.id)) return { group: g, via: m.id };
+  for (const g of state.groups) for (const m of g.members)
+    if (m.kind === "service" && (SERVICE_DOMAINS[m.id] || []).some((b) => under(domain, b))) return { group: g, via: CATALOG[m.id] };
+  return null;
+}
+function addSite(groupId, domain) {
+  for (const g of state.groups) g.members = g.members.filter((x) => !(x.kind === "site" && x.id === domain));
+  const g = groupById(groupId); g.members.push({ kind: "site", id: domain });
+  toast(`${domain} added to ${g.name}`); render();
+}
+// --- Rule engine ---------------------------------------------------------------------------
+const DATE_KINDS = { any: "Every day", "kind:holiday": "District holidays", "kind:break": "School breaks", "kind:custom": "Custom dates" };
+const dateLabel = (c) => DATE_KINDS[c] || allEntries().find((e) => "entry:" + e.id === c)?.name || "(removed date)";
+const siteLabel = (s) => s === "internet" ? "Internet" : groupById(s)?.name ?? "(removed group)";
+function dateMatches(rule, date) {
+  const ents = entriesOn(date);
+  return rule.dates.some((c) => c === "any"
+    || (c.startsWith("kind:") && ents.some((e) => e.kind === c.slice(5)))
+    || (c.startsWith("entry:") && ents.some((e) => e.id === c.slice(6))));
+}
+// First rule (top to bottom) whose sites, weekday and dates all match
+function matchRule(kid, key, date) {
+  const dow = date.getDay();
+  const i = kid.rules.findIndex((r) => r.sites.includes(key) && r.days[dow] !== undefined && dateMatches(r, date));
+  return i < 0 ? null : { rule: kid.rules[i], n: i + 1 };
+}
+const windowsFor = (kid, key, date) => { const m = matchRule(kid, key, date); return m ? m.rule.days[date.getDay()] : [[0, 1440]]; };
+// "open" / "closed" when the next two weeks are all-day open or fully blocked, else null
+function constantRule(kid, key) {
+  const days = Array.from({ length: 14 }, (_, i) => { const d = nowDate(); d.setDate(d.getDate() + i); return windowsFor(kid, key, d); });
+  if (days.every((w) => w.length === 0)) return "closed";
+  if (days.every((w) => w.length === 1 && w[0][0] === 0 && w[0][1] >= 1440)) return "open";
+  return null;
+}
+// --- Exceptions: temporary allow/block for one child, outside the rule list ---------------------
+// Active from "from" until "until"; once "until" passes it no longer exists. Newest wins on overlap.
+const liveExceptions = () => state.exceptions.filter((x) => x.until > Date.now());
+function activeException(kid, key, at = Date.now()) {
+  return liveExceptions().filter((x) => x.kid === kid.id && x.sites.includes(key) && x.from <= at).at(-1) || null;
+}
+function status(kid, key) {
+  const now = nowDate(), t = minsNow();
+  if (kid.paused) return { cls: "stop", label: "Paused", why: "All internet paused by a parent" };
+  if (key !== "internet") {
+    const net = status(kid, "internet");
+    if (net.cls === "stop") return { cls: "stop", label: "Blocked, internet is off", why: `Internet: ${net.label}` };
+  }
+  const ex = activeException(kid, key);
+  if (ex) return ex.open ? { cls: "temp", label: `Open until ${fmtDate(new Date(ex.until))}`, why: `Exception${ex.note ? ": " + ex.note : ""}` }
+                         : { cls: "stop", label: `Blocked until ${fmtDate(new Date(ex.until))}`, why: `Exception${ex.note ? ": " + ex.note : ""}` };
+  const m = matchRule(kid, key, now), why = m ? `Rule ${m.n}: ${m.rule.name}` : "No rule matches, allowed by default";
+  const wins = windowsFor(kid, key, now);
+  const cur = wins.find(([a, b]) => t >= a && t < b);
+  if (cur) return { cls: "ok", label: cur[1] >= 1440 ? "Open all day" : `Open until ${fmt(cur[1])}`, why };
+  const next = wins.find(([a]) => a > t);
+  if (next) return { cls: "stop", label: `Blocked, opens ${fmt(next[0])}`, why };
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(now); d.setDate(d.getDate() + i);
+    const w = windowsFor(kid, key, d);
+    if (w.length) return { cls: "stop", label: `Blocked, opens ${DAYS[d.getDay()]} ${fmt(w[0][0])}`, why };
+  }
+  return { cls: "stop", label: "Blocked all week", why };
+}
+
+let toastTimer;
+function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.hidden = true), 2600); }
+
+// One exception per child: a new one replaces whatever that child had. Returns true if it replaced one.
+function addException(kidId, sites, open, from, until, note = "") {
+  const replaced = liveExceptions().some((x) => x.kid === kidId);
+  state.exceptions = state.exceptions.filter((x) => x.kid !== kidId);
+  state.exceptions.push({ id: "x" + Date.now() + Math.random().toString(36).slice(2, 5), kid: kidId, sites, open, from, until, note });
+  return replaced;
+}
+// Quick actions on the Today tab create exceptions too
+function override(kidId, key, open, minutes) {
+  const kid = kidById(kidId), now = nowDate();
+  let until;
+  if (minutes === "tonight") { until = new Date(now); until.setHours(21, 0, 0, 0); if (until <= now) until.setDate(until.getDate() + 1); }
+  else if (minutes === "window") {
+    const cur = windowsFor(kid, key, now).find(([a, b]) => minsNow() >= a && minsNow() < b);
+    until = new Date(now); if (cur) until.setHours(0, cur[1], 0, 0); else until = new Date(now.getTime() + 3600000);
+  } else until = new Date(now.getTime() + minutes * 60000);
+  const replaced = addException(kidId, [key], open, now.getTime(), until.getTime(), "Quick action");
+  toast(`${keyName(key)} ${open ? "opened" : "blocked"} for ${kid.name} until ${fmtDate(until)}${replaced ? " (replaced the earlier exception)" : ""}`);
+  render();
+}
+// "Back to schedule": end every live exception of this child that covers this group
+function clearOverride(kidId, key) {
+  const kid = kidById(kidId), now = Date.now();
+  state.exceptions = state.exceptions.filter((x) => !(x.kid === kidId && x.sites.includes(key) && x.from <= now));
+  toast(`${kid.name}: ${keyName(key)} back to the schedule`); render();
+}
+
+const TABS = { today: "Today", exceptions: "Exceptions", schedule: "Schedules", groups: "Site groups", days: "Calendar", devices: "Devices" };
+function renderTabs() {
+  $("#tabs").innerHTML = Object.entries(TABS).map(([k, v]) =>
+    `<button role="tab" aria-selected="${state.tab === k}" data-tab="${k}">${v}</button>`).join("");
+}
+
+function scheduledBlock(kid, key) {
+  const s = status(kid, key);
+  const hasOv = !!activeException(kid, key);
+  const isNet = key === "internet";
+  let acts;
+  if (isNet) acts = kid.paused
+    ? `<button class="btn primary" data-act="resume" data-kid="${kid.id}">Resume internet</button>`
+    : `<button class="btn danger" data-act="pause" data-kid="${kid.id}">Pause all internet</button>`;
+  else if (kid.paused) acts = "";
+  else if (s.cls === "ok" || s.cls === "temp") acts = `<button class="btn" data-act="block" data-kid="${kid.id}" data-key="${key}">Block now</button>`;
+  else acts = `<button class="btn" data-act="open" data-min="30" data-kid="${kid.id}" data-key="${key}">Open 30 min</button>
+               <button class="btn" data-act="open" data-min="60" data-kid="${kid.id}" data-key="${key}">Open 1 hour</button>
+               <button class="btn" data-act="open" data-min="tonight" data-kid="${kid.id}" data-key="${key}">Open until 9 PM</button>`;
+  if (hasOv && !kid.paused) acts += `<button class="btn" data-act="clear" data-kid="${kid.id}" data-key="${key}">Back to schedule</button>`;
+  const members = isNet ? "" : `<div class="why">${groupById(key).members.map(memberLabel).map(esc).join(", ")}</div>`;
+  return `<div class="svc">
+    <div class="svc-line"><span class="svc-name">${esc(keyName(key))}</span><span class="pill ${s.cls}">${s.label}</span></div>
+    ${members}<div class="why">${esc(s.why)}</div>
+    ${acts ? `<div class="actions">${acts}</div>` : ""}</div>`;
+}
+
+function viewToday() {
+  const ents = entriesOn(nowDate());
+  if (!state.kids.length) return `<section class="panel empty"><h2>Welcome</h2>
+    <p class="note">Start by adding your children. Each child gets their own rules on the Schedules tab.</p>
+    <button class="btn primary" data-act="addkid">Add a child</button></section>`;
+  return `${newDevicesHint()}${districtNotices(false)}${syncPanel()}<p class="note">Today is ${ents.length ? `<b>${ents.map((e) => esc(e.name)).join(", ")}</b> on the calendar` : "a regular day on the calendar"}.</p>
+  <div class="kids">${state.kids.map((kid) => {
+    const sched = state.groups.filter((g) => !constantRule(kid, g.id));
+    const fixed = state.groups.filter((g) => constantRule(kid, g.id));
+    return `<section class="kid" aria-label="${esc(kid.name)}">
+      <div class="kid-head">
+        <div class="avatar" style="background:${kid.color}">${esc(kid.name[0])}</div>
+        <div><h2>${esc(kid.name)}</h2><div class="muted small">${kid.safeSearch ? "Safe search on" : "Safe search off"}</div></div>
+        <div class="devs muted small">${kidDevices(kid).length} devices<br>${kidDevices(kid).filter(online).length} online</div>
+      </div>
+      ${kidSyncLine(kid)}
+      ${scheduledBlock(kid, "internet")}
+      ${sched.map((g) => scheduledBlock(kid, g.id)).join("")}
+      ${fixed.length ? `<div class="always">${fixed.map((g) => { const c = constantRule(kid, g.id);
+        return `<span><b>${esc(g.name)}</b> <span class="pill ${c === "open" ? "ok" : "stop"}">${c === "open" ? "Open all the time" : "Blocked all the time"}</span></span>`; }).join("")}</div>` : ""}
+    </section>`; }).join("")}</div>`;
+}
+
+// --- Exceptions tab ------------------------------------------------------------------------------
+const left = (ms) => { const m = Math.max(1, Math.round((ms - Date.now()) / 60000)); return m < 60 ? `${m} min left` : `${Math.floor(m / 60)} h ${m % 60} min left`; };
+const LENGTHS = { 30: "30 minutes", 60: "1 hour", 120: "2 hours", 180: "3 hours", 240: "4 hours", 360: "6 hours", 720: "12 hours" };
+const exSummary = (x) => `${x.open ? "Allow" : "Block"} ${x.sites.map(siteLabel).join(", ")}`;
+
+function viewExceptions() {
+  if (!state.kids.length) return `<section class="panel"><p class="note">Add a child on the Schedules tab first.</p></section>`;
+  const rows = liveExceptions().filter((x) => x.from <= Date.now());
+  return `<section class="panel">
+    <h2>Active now</h2>
+    ${rows.length ? `<div class="scroll"><table><thead><tr><th>Child</th><th>Exception</th><th>Until</th><th>Note</th><th></th></tr></thead><tbody>
+      ${rows.map((x) => `<tr><td><b>${esc(kidById(x.kid)?.name ?? "?")}</b></td>
+        <td><span class="pill ${x.open ? "ok" : "stop"}">${x.open ? "Allow" : "Block"}</span> ${x.sites.map((s) => esc(siteLabel(s))).join(", ")}</td>
+        <td class="mono small">${fmtDate(new Date(x.until))} <span class="muted">· ${left(x.until)}</span></td>
+        <td class="small">${esc(x.note || "")}</td>
+        <td><button class="btn danger" data-delex="${x.id}">End now</button></td></tr>`).join("")}
+    </tbody></table></div>` : `<p class="note">No exceptions running. Each child can have one at a time.</p>`}
+  </section>
+  <section class="panel">
+    <h2>Favorites</h2>
+    ${state.favorites.length ? `<div class="favs">${state.favorites.map((f) => `<div class="fav">
+      <button class="btn primary" data-applyfav="${f.id}">Start</button>
+      <div class="fav-text"><b>${esc(kidById(f.kid)?.name ?? "?")}</b> · ${esc(exSummary(f))} · ${LENGTHS[f.minutes]}
+        ${f.note ? `<div class="muted small">${esc(f.note)}</div>` : ""}</div>
+      <button class="btn danger" data-delfav="${f.id}" aria-label="Remove favorite">×</button></div>`).join("")}</div>`
+      : `<p class="note">Tick “Save as favorite” below to keep an exception here for one-click use.</p>`}
+  </section>
+  <section class="panel">
+    <h2>Add an exception</h2>
+    <p class="note">Starts now and wins over the rules while it lasts. A new exception replaces the child's current one. It cannot open sites while that child's Internet is off; include Internet to change that too.</p>
+    <form class="ex-form" id="exform">
+      <div class="form">
+        <label>Child<select id="x-kid">${state.kids.map((k) => `<option value="${k.id}">${esc(k.name)}</option>`).join("")}</select></label>
+        <fieldset class="inline"><legend>Action</legend>
+          <label class="pick"><input type="radio" name="x-act" value="allow" checked> Allow</label>
+          <label class="pick"><input type="radio" name="x-act" value="block"> Block</label></fieldset>
+        <label>For how long<select id="x-len">${Object.entries(LENGTHS).map(([v, l]) => `<option value="${v}" ${v === "60" ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      </div>
+      <fieldset><legend>Sites <span class="muted small">(pick one or more)</span></legend>
+        <div class="picks"><label class="pick"><input type="checkbox" class="x-site" value="internet"> Internet (everything)</label>
+          ${state.groups.map((g) => `<label class="pick"><input type="checkbox" class="x-site" value="${g.id}"> ${esc(g.name)}</label>`).join("")}</div>
+      </fieldset>
+      <div class="form">
+        <label>Note<input id="x-note" placeholder="e.g. Homework done early"></label>
+        <label class="pick"><input type="checkbox" id="x-fav"> Save as favorite</label>
+      </div>
+      <div class="actions"><button class="btn primary">Start exception</button></div>
+    </form>
+  </section>`;
+}
+
+function startException(kid, sites, open, minutes, note) {
+  const now = Date.now(), replaced = addException(kid, sites, open, now, now + minutes * 60000, note);
+  toast(`${kidById(kid).name}: ${exSummary({ sites, open })} until ${fmtDate(new Date(now + minutes * 60000))}${replaced ? " (replaced the earlier one)" : ""}`);
+}
+function submitException() {
+  const kid = $("#x-kid").value;
+  const sites = [...document.querySelectorAll(".x-site:checked")].map((x) => x.value);
+  const open = document.querySelector('input[name="x-act"]:checked').value === "allow";
+  const minutes = Number($("#x-len").value), note = $("#x-note").value.trim();
+  if (!sites.length) return toast("Pick at least one site group or Internet");
+  if ($("#x-fav").checked) state.favorites.push({ id: "f" + Date.now(), kid, sites, open, minutes, note });
+  startException(kid, sites, open, minutes, note);
+  render();
+}
+
+// --- Schedules: one child's rule list ----------------------------------------------------------
+const WEEK = [1, 2, 3, 4, 5, 6, 0];
+const TICKS = [0, 6, 12, 18, 24].map((x) => `<span style="left:${x / 24 * 100}%">${x === 0 || x === 24 ? "12a" : x === 12 ? "12p" : x < 12 ? x + "a" : (x - 12) + "p"}</span>`).join("");
+const bar = (wins, nowAt) => `<div class="tl-bar">${(wins || []).map(([a, b]) =>
+  `<span class="open" style="left:${a / 14.4}%;width:${(b - a) / 14.4}%" title="${fmt(a)} – ${fmt(b)}"></span>`).join("")}
+  ${nowAt != null ? `<span class="now" style="left:${nowAt / 14.4}%"></span>` : ""}</div>`;
+const winText = (w) => w.length === 0 ? "blocked all day" : w.map(([a, b]) => a === 0 && b >= 1440 ? "all day" : `${fmt(a)}–${fmt(b)}`).join(", ");
+
+const appliesNow = (kid, r) => r.sites.some((s) => matchRule(kid, s, nowDate())?.rule === r);
+// "Mon–Fri 5:00 PM–8:00 PM · Sat–Sun 9:00 AM–9:00 PM": consecutive days with the same times merge
+function daysSummary(r) {
+  const parts = [];
+  for (const d of WEEK) {
+    if (r.days[d] === undefined) continue;
+    const text = winText(r.days[d]), last = parts.at(-1);
+    if (last && last.text === text && WEEK.indexOf(last.to) === WEEK.indexOf(d) - 1) last.to = d;
+    else parts.push({ from: d, to: d, text });
+  }
+  return parts.map((p) => `${DAYS[p.from]}${p.to !== p.from ? "–" + DAYS[p.to] : ""} ${p.text}`).join(" · ") || "No days picked";
+}
+
+function ruleList(kid) {
+  const sel = state.selRule;
+  return `<div class="scroll"><table class="rule-list"><thead><tr><th>#</th><th>Rule</th><th>Dates</th><th>Sites</th><th>Days and times</th><th>Order</th></tr></thead><tbody>
+    ${kid.rules.map((r, i) => `<tr class="${r.id === sel ? "sel" : ""}">
+      <td class="mono">${i + 1}</td>
+      <td><button class="linkish" data-selrule="${r.id}" aria-pressed="${r.id === sel}">${esc(r.name)}</button>
+        ${appliesNow(kid, r) ? `<div><span class="pill temp">Applies now</span></div>` : ""}</td>
+      <td>${r.dates.map((c) => esc(dateLabel(c))).join(", ")}</td>
+      <td>${r.sites.map((s) => esc(siteLabel(s))).join(", ")}</td>
+      <td class="small">${esc(daysSummary(r))}</td>
+      <td><div class="actions nowrap">
+        <button class="btn" data-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(r.name)} up">↑</button>
+        <button class="btn" data-down="${i}" ${i === kid.rules.length - 1 ? "disabled" : ""} aria-label="Move ${esc(r.name)} down">↓</button></div></td>
+    </tr>`).join("")}
+    <tr class="fallback-row"><td class="mono">·</td><td><b>No rule matches</b></td><td colspan="4" class="muted small">Allowed. Sites and days not covered by any rule above stay open.</td></tr>
+  </tbody></table></div>`;
+}
+
+function ruleCard(kid, r, i) {
+  const today = nowDate().getDay(), t = minsNow();
+  return `<section class="rule">
+    <div class="rule-head">
+      <span class="rule-n mono">${i + 1}</span>
+      <h3>${esc(r.name)}</h3>
+      ${appliesNow(kid, r) ? `<span class="pill temp">Applies now</span>` : ""}
+      <div class="actions rule-acts">
+        <button class="btn" data-editrule="${r.id}">Edit</button>
+        <button class="btn danger" data-delrule="${r.id}">Delete</button>
+      </div>
+    </div>
+    <div class="rule-what">
+      <div><span class="lbl">Dates</span> ${r.dates.map((c) => `<span class="chip">${esc(dateLabel(c))}</span>`).join(" ")}</div>
+      <div><span class="lbl">Sites</span> ${r.sites.length ? r.sites.map((s) => `<span class="chip">${esc(siteLabel(s))}</span>`).join(" ") : `<span class="muted small">None picked</span>`}</div>
+    </div>
+    <div class="timeline">
+      <div class="tl-axis"><span></span><div class="tl-ticks">${TICKS}</div></div>
+      ${WEEK.map((d) => r.days[d] === undefined
+        ? `<div class="tl-row off"><span class="tl-day">${DAYS[d]}</span><span class="muted small">Not part of this rule</span></div>`
+        : `<div class="tl-row ${d === today ? "today" : ""}"><span class="tl-day">${DAYS[d]}</span>${bar(r.days[d], d === today ? t : null)}</div>`).join("")}
+    </div>
+  </section>`;
+}
+
+function ruleEditor(kid) {
+  const r = state.draft, isNew = !kid.rules.some((x) => x.id === r.id);
+  const named = allEntries().filter((e) => e.to >= isoDay(nowDate()));
+  const check = (cls, val, on, label) => `<label class="pick"><input type="checkbox" class="${cls}" value="${esc(val)}" ${on ? "checked" : ""}> ${esc(label)}</label>`;
+  return `<form class="rule editing" id="ruleform">
+    <div class="rule-head"><h3>${isNew ? "New rule" : "Edit rule"}</h3></div>
+    <label class="small muted">Name<input id="r-name" value="${esc(r.name)}" required></label>
+    <fieldset><legend>Dates <span class="muted small">(any of these)</span></legend>
+      <div class="picks">${Object.entries(DATE_KINDS).map(([v, l]) => check("r-date", v, r.dates.includes(v), l)).join("")}</div>
+      <div class="picks">${named.map((e) => check("r-date", "entry:" + e.id, r.dates.includes("entry:" + e.id), `${e.name} · ${e.from.slice(5).replace("-", "/")}${e.to !== e.from ? "–" + e.to.slice(5).replace("-", "/") : ""}`)).join("")}</div>
+    </fieldset>
+    <fieldset><legend>Sites <span class="muted small">(any of these)</span></legend>
+      <div class="picks">${check("r-site", "internet", r.sites.includes("internet"), "Internet (everything)")}
+        ${state.groups.map((g) => check("r-site", g.id, r.sites.includes(g.id), g.name)).join("")}</div>
+    </fieldset>
+    <fieldset><legend>Days and open times <span class="muted small">(green = allowed, the rest of the day is blocked)</span></legend>
+      <div class="timeline">
+        <div class="tl-axis"><span></span><div class="tl-ticks">${TICKS}</div></div>
+        ${WEEK.map((d) => { const on = r.days[d] !== undefined;
+          return `<div class="day-edit">
+            <div class="tl-row ${on ? "" : "off"}">
+              <label class="tl-day"><input type="checkbox" class="r-day" value="${d}" ${on ? "checked" : ""}> ${DAYS[d]}</label>
+              ${on ? bar(r.days[d]) : `<span class="muted small">Not part of this rule</span>`}
+            </div>
+            ${on ? `<div class="win-list">
+              ${r.days[d].map(([a, b], i) => `<div class="win">
+                <input type="time" aria-label="${DAYS[d]} open from" id="w-${d}-${i}-a" value="${toHHMM(a)}">
+                <span class="muted small">to</span>
+                <input type="time" aria-label="${DAYS[d]} open until" id="w-${d}-${i}-b" value="${toHHMM(b % 1440)}">
+                <button type="button" class="btn danger" data-dwdel="${d}|${i}" aria-label="Remove time">×</button></div>`).join("") || `<span class="muted small">Blocked all day</span>`}
+              <button type="button" class="btn" data-dwadd="${d}">Add time</button>
+              <button type="button" class="btn" data-dwall="${d}">All day</button>
+              <button type="button" class="btn" data-dwcopy="${d}">Copy to other checked days</button>
+            </div>` : ""}
+          </div>`; }).join("")}
+      </div>
+    </fieldset>
+    <div class="actions">
+      <button class="btn primary">Save rule</button>
+      <button type="button" class="btn" data-act="canceldraft">Cancel</button>
+      ${isNew ? "" : `<button type="button" class="btn danger" data-delrule="${r.id}">Delete rule</button>`}
+    </div>
+  </form>`;
+}
+
+const COLORS = ["#3f7d6e", "#7a5aa6", "#b5532f", "#2b6cb0", "#a23d6d", "#6b7a1f", "#4d5b70"];
+function kidEditor() {
+  const k = state.kidForm, old = kidById(k.id);
+  return `<form class="panel" id="kidform">
+    <h2>${old ? "Edit " + esc(old.name) : "Add a child"}</h2>
+    <div class="form"><label>Name<input id="k-name" value="${esc(k.name)}" maxlength="40" required></label></div>
+    <div class="swatches" role="group" aria-label="Color">${COLORS.map((c) => `<button type="button" class="swatch" style="background:${c}" data-color="${c}" aria-pressed="${k.color === c}" aria-label="Color ${c}"></button>`).join("")}</div>
+    <label class="pick" style="justify-self:start"><input type="checkbox" id="k-safe" ${k.safeSearch ? "checked" : ""}> Safe search on Google, Bing and YouTube</label>
+    <div class="actions">
+      <button class="btn primary">${old ? "Save" : "Add child"}</button>
+      <button type="button" class="btn" data-act="cancelkid">Cancel</button>
+      ${old ? `<button type="button" class="btn danger" data-act="delkid">${k.confirmDelete ? "Click again to delete " + esc(old.name) : "Delete child"}</button>` : ""}
+    </div>
+    ${old && k.confirmDelete ? `<p class="note">Deletes their rules, exception and favorites. Their devices become unmanaged.</p>` : ""}
+  </form>`;
+}
+
+function viewSchedule() {
+  const kid = kidById(state.schedKid);
+  const editing = state.draft;
+  if (state.kidForm) return kidEditor();
+  if (!kid) return `<section class="panel empty"><h2>No children yet</h2>
+    <p class="note">Add each child, then give them rules here and assign their devices on the Devices tab.</p>
+    <button class="btn primary" data-act="addkid">Add a child</button></section>`;
+  return `<section class="panel">
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Child">${state.kids.map((k) => `<button aria-pressed="${k.id === kid.id}" data-skid="${k.id}">${esc(k.name)}</button>`).join("")}</div>
+      ${editing ? "" : `<button class="btn primary" data-act="addrule">Add rule</button>
+        <button class="btn" data-act="editkid">Edit ${esc(kid.name)}</button>
+        <button class="btn" data-act="addkid">Add child</button>`}
+    </div>
+    <p class="note">Rules are checked from the top. For each site group, the first rule whose dates, weekday and sites all match decides when it is allowed. When Internet is blocked, every site is blocked. Pick a rule to see its details below.</p>
+    ${ruleList(kid)}
+  </section>
+  ${(() => {
+    if (editing) return ruleEditor(kid);
+    const i = kid.rules.findIndex((r) => r.id === state.selRule);
+    return i < 0 ? `<section class="rule fallback"><p class="note">Pick a rule above to see its days and times.</p></section>` : ruleCard(kid, kid.rules[i], i);
+  })()}`;
+}
+
+// Copy what is on screen into the draft before any re-render
+function readDraft() {
+  const r = state.draft; if (!r || !document.getElementById("ruleform")) return;
+  r.name = $("#r-name").value;
+  r.dates = [...document.querySelectorAll(".r-date:checked")].map((x) => x.value);
+  r.sites = [...document.querySelectorAll(".r-site:checked")].map((x) => x.value);
+  const days = {};
+  for (const box of document.querySelectorAll(".r-day")) {
+    const d = Number(box.value);
+    if (!box.checked) continue;
+    const wins = (r.days[d] || []).map((w, i) => {
+      const a = document.getElementById(`w-${d}-${i}-a`), b = document.getElementById(`w-${d}-${i}-b`);
+      return a && b && a.value && b.value ? [fromHHMM(a.value), fromHHMM(b.value) || 1440] : w;
+    });
+    days[d] = r.days[d] === undefined ? [[h(16), h(20)]] : wins.sort((x, y) => x[0] - y[0]);
+  }
+  r.days = days;
+}
+
+function viewGroups() {
+  const options = Object.entries(CATALOG).map(([id, l]) => `<option value="${esc(l)}"></option>`).join("");
+  return `<datalist id="catalog">${options}</datalist>
+  <p class="note">A group bundles services and websites so one rule covers all of them. Rules on the Schedules tab decide when each group is allowed for each child.</p>
+  <div class="groups">${state.groups.map((g) => `<section class="panel" aria-label="${esc(g.name)}">
+    <div class="svc-line" style="justify-content:space-between"><h2>${esc(g.name)}</h2>
+      <button class="btn danger" data-delgroup="${g.id}">Delete group</button></div>
+    <div class="members">${g.members.map((m, i) => `<span class="member">${esc(memberLabel(m))}
+      <span class="kind">${m.kind === "service" ? "service" : m.kind === "filter" ? "category" : "site"}</span>
+      <button aria-label="Remove ${esc(memberLabel(m))}" data-delmember="${g.id}|${i}">×</button></span>`).join("") || `<span class="muted small">Empty group</span>`}</div>
+    <form class="form" data-addmember="${g.id}">
+      <label>Add a service or website<input list="catalog" id="m-${g.id}" placeholder="TikTok or example.com" required></label>
+      <button class="btn">Add</button>
+    </form>
+    <div class="list">${state.kids.map((k) => { const c = constantRule(k, g.id);
+      return `<div class="policy-row"><span class="who">${esc(k.name)}</span>
+      <span class="small ${c ? "" : "muted"}">${c === "open" ? "Open all the time" : c === "closed" ? "Blocked all the time" : "Limited by rules"}</span>
+      <button class="btn" data-goto="${k.id}">Edit rules</button></div>`; }).join("")}</div>
+  </section>`).join("")}
+  <section class="panel">
+    <h2>New group</h2>
+    <form class="form" id="groupform"><label>Name<input id="g-name" placeholder="e.g. Shopping" required></label><button class="btn primary">Create group</button></form>
+  </section></div>`;
+}
+
+function viewDays() {
+  const today = isoDay(nowDate());
+  const rows = allEntries().filter((e) => e.to >= today);
+  const dist = state.district, orphans = orphanEdits();
+  const ignored = Object.keys(dist.ignored).filter((id) => !orphans.includes(id)).length;
+  const niceDate = (iso) => { const d = new Date(iso + "T12:00:00"); return `${DAYS[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; };
+  const span = (e) => e.from === e.to ? niceDate(e.from) : `${niceDate(e.from)} – ${niceDate(e.to)}`;
+  const nDays = (e) => Math.round((new Date(e.to + "T12:00:00") - new Date(e.from + "T12:00:00")) / 86400000) + 1;
+  return `<section class="panel">
+    <div class="svc-line" style="justify-content:space-between"><h2>Bellevue School District calendar</h2>
+      <button class="btn" data-act="sync">Sync now</button></div>
+    <p class="note">No-school days come from the district's “Holidays and Closures” calendar and apply to every child. The CM4 checks it every night at 3 AM.
+      ${dist.lastSync ? "Last synced " + whenText(dist.lastSync) : "Using the district calendar as of 10/9/2026"}. Early-release days are not synced.</p>
+    ${dist.lastError ? `<p class="small"><b style="color:var(--stop)">Last try failed (${whenText(dist.lastAttempt)}):</b> ${esc(dist.lastError)}. The calendar below is still used.</p>` : ""}
+    ${districtNotices(true)}
+    ${orphans.length ? `<div class="banner">${orphans.length} of your district edits no longer match an entry (the district moved or removed it):
+      ${orphans.map((id) => `<div>${dist.ignored[id] ? "Ignored" : "Changed end of"} the entry that started ${esc(id.slice(1))}
+        <button class="btn" data-droporphan="${id}">Remove this edit</button></div>`).join("")}</div>` : ""}
+  </section>
+  <section class="panel">
+    <h2>Holidays and breaks</h2>
+    <p class="note">Entries only say which days are a holiday or a break. What happens on those days is set by the rules on the Schedules tab.</p>
+    <form class="form" id="dayform">
+      <label>Name<input id="c-name" placeholder="e.g. Summer break" required></label>
+      <label>First day<input type="date" id="c-from" required></label>
+      <label>Last day<input type="date" id="c-to"></label>
+      <label>Kind<select id="c-kind">${Object.entries(ENTRY_KINDS).map(([k, v]) => `<option value="${k}" ${k === "break" ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+      <button class="btn primary">Add</button>
+    </form>
+    <div class="scroll"><table><thead><tr><th>Dates</th><th>Name</th><th>Kind</th><th>Source</th><th></th></tr></thead><tbody>
+      ${rows.map((e) => `<tr>
+        <td class="mono">${span(e)}${e.from !== e.to ? ` <span class="muted small">(${nDays(e)} days)</span>` : ""}${e.from <= today && e.to >= today ? ` <span class="pill temp">Now</span>` : ""}
+          ${e.kind === "break" ? `<div><label class="small muted">Last day <input type="date" value="${e.to}" min="${e.from}" data-entryto="${e.id}"></label></div>` : ""}</td>
+        <td>${esc(e.name)}</td><td>${ENTRY_KINDS[e.kind]}</td>
+        <td>${e.source === "district"
+          ? (e.districtTo ? `<span class="chip warn">End changed by you</span> <button class="btn" data-resetentry="${e.id}">Use district date (${esc(e.districtTo)})</button>` : `<span class="chip">District</span>`)
+          : `<span class="chip">Added by you</span>`}</td>
+        <td><button class="btn danger" data-delentry="${e.id}">${e.source === "district" ? "Ignore" : "Remove"}</button></td></tr>`).join("")}
+    </tbody></table></div>
+    ${ignored ? `<div><button class="btn" data-act="unignore">Restore ${ignored} ignored district entr${ignored > 1 ? "ies" : "y"}</button></div>` : ""}
+  </section>`;
+}
+
+function domainStatus(dev, domain) {
+  const hit = groupOfDomain(domain);
+  if (!hit) return { cls: "", label: "Not in a group", group: null };
+  const kid = dev.kid && kidById(dev.kid);
+  if (!kid) return { cls: "", label: `${hit.group.name}`, group: hit.group, via: hit.via, note: "device not managed" };
+  const s = status(kid, hit.group.id);
+  return { cls: s.cls, label: `${s.cls === "stop" ? "Blocked" : "Allowed"} · ${hit.group.name}`, group: hit.group, via: hit.via };
+}
+
+// Merge subdomains under their main domain; keep only lookups inside the chosen time range
+function siteRows(dev) {
+  const rows = new Map();
+  for (const [domain, n, when] of state.activity?.rows || []) {
+    if (when > state.range) continue;
+    if (!state.showSystem && isSystem(domain)) continue;
+    const base = baseDomain(domain);
+    const r = rows.get(base) || { base, n: 0, when: Infinity, subs: [] };
+    r.n += n; r.when = Math.min(r.when, when); r.subs.push([domain, n, when]);
+    rows.set(base, r);
+  }
+  return [...rows.values()].sort((a, b) => b.n - a.n);
+}
+
+function siteTable(dev, rows, groupOpts) {
+  if (!rows.length) return `<p class="note">None in this time range.</p>`;
+  return `<div class="scroll"><table><thead><tr><th>Website</th><th>Lookups</th><th>Last</th><th>Group</th><th>Add to group</th></tr></thead><tbody>
+    ${rows.map((r) => { const s = domainStatus(dev, r.base);
+      const name = r.subs.length > 1
+        ? `<details><summary class="mono">${esc(r.base)} <span class="muted small">(${r.subs.length} addresses)</span></summary>
+             <div class="muted small mono">${r.subs.map(([d, n]) => `${esc(d)} · ${n}`).join("<br>")}</div></details>`
+        : `<span class="mono">${esc(r.subs[0][0])}</span>`;
+      return `<tr><td>${name}${s.via && s.via !== r.base ? `<div class="muted small">via ${esc(s.via)}</div>` : ""}</td>
+        <td class="mono">${r.n}</td><td class="mono">${ago(r.when)}</td>
+        <td>${s.group ? esc(s.group.name) : `<span class="muted small">None</span>`}</td>
+        <td><form class="form" data-addsite="${esc(r.base)}">
+          <select aria-label="Group for ${esc(r.base)}">${groupOpts}</select>
+          <button class="btn">${s.group ? "Move" : "Add"}</button></form></td></tr>`; }).join("")}
+  </tbody></table></div>`;
+}
+
+function viewDevices() {
+  const dev = state.devices.find((d) => d.id === state.openDevice);
+  const groupOpts = state.groups.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join("");
+  if (!state.devices.length) return `<section class="panel"><h2>Devices</h2>
+    <p class="note">No devices seen yet. The CM4 checks the network every minute.</p></section>`;
+  const visible = state.devices
+    .filter((d) => d.kid || d.name || d.lastSeen <= 10080 || state.showAllDevices)
+    .sort((a, b) => isNew(b) - isNew(a) || (b.kid ? 1 : 0) - (a.kid ? 1 : 0) || (b.side === "wireless") - (a.side === "wireless")
+      || (b.online ? 1 : 0) - (a.online ? 1 : 0) || a.lastSeen - b.lastSeen || devName(a).localeCompare(devName(b)));
+  const hidden = state.devices.length - visible.length;
+  const behind = state.devices.some((d) => d.side === "wireless");
+  const fresh = visible.filter(isNew);
+  const act = state.activity && dev && state.activity.mac === dev.mac ? state.activity : null;
+  const rows = dev && act?.rows ? siteRows(dev) : [];
+  const blocked = rows.filter((r) => domainStatus(dev, r.base).cls === "stop");
+  const notBlocked = rows.filter((r) => domainStatus(dev, r.base).cls !== "stop");
+  const nameCell = (d) => state.renaming === d.mac
+    ? `<form class="form nowrap" data-rename="${esc(d.mac)}"><input id="rn-${esc(d.mac)}" value="${esc(d.name || d.host || "")}" maxlength="60" aria-label="Device name" autofocus>
+        <button class="btn primary">Save</button><button type="button" class="btn" data-act="cancelrename">Cancel</button></form>`
+    : `<button class="linkish" data-rename="${esc(d.mac)}" title="Rename">${esc(devName(d))}</button>
+        ${d.name && d.host && d.name !== d.host ? `<div class="muted small">${esc(d.host)}</div>` : ""}
+        ${isNew(d) ? `<div><span class="chip new">New</span> <span class="muted small">joined ${ago(Math.round((Date.now() - d.firstSeen) / 60000))}</span></div>` : ""}
+        ${isNew(d) && lookalike(d) ? `<div class="small">Same name as <b>${esc(devName(lookalike(d)))}</b> (${esc(kidById(lookalike(d).kid)?.name ?? "")}): probably that device with a new address</div>` : ""}
+        ${d.private ? `<div><span class="chip warn">Private address on</span>${isNew(d) ? ` <span class="small">could be a child's device hiding its usual address</span>` : ""}</div>` : ""}
+        ${d.side === "other" && d.kid ? `<div><span class="chip warn">Not behind the CM4: rules can't apply</span></div>` : ""}`;
+  return `<section class="panel">
+    <h2>Devices</h2>
+    <p class="note">Assign each device to a child so their rules apply. Children's and named devices always stay listed; others show if seen in the last 7 days. Click a name to rename it. Phones and tablets must have “Private Wi-Fi address” turned off.</p>
+    ${fresh.length ? `<div class="banner"><b>${fresh.length} new device${fresh.length > 1 ? "s" : ""} on the Wi-Fi</b> (listed first).
+      A child's device shows up here as new when its address changes, for example when “Private Wi-Fi address” is turned back on. Assign it to the child, or mark it as not a child's device.
+      <div><button class="btn" data-act="reviewall">Mark all ${fresh.length} as not a child's device</button></div></div>` : ""}
+    ${behind ? "" : `<div class="banner">The wireless hub is not behind the CM4 yet, so every device shows as “Home network”. You can already name devices and assign them to children.</div>`}
+    <div class="scroll"><table class="devices"><thead><tr><th>Device</th><th>Belongs to</th><th>IP</th><th>MAC</th><th>Network</th><th>Last seen</th><th></th></tr></thead><tbody>
+      ${visible.map((d) => `<tr>
+        <td>${nameCell(d)}</td>
+        <td><select aria-label="Assign ${esc(devName(d))}" data-assign="${esc(d.id)}">
+          <option value="" ${d.kid ? "" : "selected"}>Not managed</option>
+          ${state.kids.map((k) => `<option value="${k.id}" ${d.kid === k.id ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select></td>
+        <td class="mono">${esc(d.ip || "–")}</td><td class="mono">${esc(d.mac)}</td>
+        <td class="small">${d.side === "wireless" ? "Wireless (behind the CM4)" : d.side === "other" ? "Home network" : "–"}</td>
+        <td>${online(d) ? `<span class="chip">Online</span>` : `<span class="muted small">${d.lastSeen === Infinity ? "not seen" : ago(d.lastSeen)}</span>`}</td>
+        <td class="nowrap">${isNew(d) ? `<button class="btn" data-review="${esc(d.id)}">Not a child's</button> ` : ""}<button class="btn" data-opendev="${esc(d.id)}" aria-pressed="${d.id === state.openDevice}">${d.id === state.openDevice ? "Showing sites" : "Sites visited"}</button></td></tr>`).join("")}
+    </tbody></table></div>
+    ${hidden || state.showAllDevices ? `<div><button class="btn" data-act="alldev">${state.showAllDevices ? "Hide devices not seen for 7 days" : `Show ${hidden} older device${hidden > 1 ? "s" : ""}`}</button></div>` : ""}
+  </section>
+  ${dev ? `<section class="panel">
+    <div class="svc-line" style="justify-content:space-between"><h2>Sites visited · ${esc(devName(dev))}</h2>
+      <span class="muted small">${dev.kid ? `Rules of ${esc(kidById(dev.kid)?.name ?? "?")}` : "Not managed: nothing is blocked"}</span></div>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Time range">${Object.entries(RANGES).map(([m, l]) => `<button aria-pressed="${state.range === Number(m)}" data-range="${m}">${l}</button>`).join("")}</div>
+      <label class="small muted"><input type="checkbox" id="sys" ${state.showSystem ? "checked" : ""}> Show background traffic</label>
+    </div>
+    ${!act || act.loading ? `<p class="note">Reading the AdGuard query log…</p>`
+      : act.error ? `<p class="note">${esc(act.error)}</p>`
+      : !act.ip ? `<p class="note">The CM4 doesn't know this device's IP address right now, so its lookups can't be found.</p>`
+      : `${act.truncated ? `<div class="banner">Very busy device: only the most recent 20,000 lookups are counted.</div>` : ""}
+    ${dev.side !== "wireless" ? `<p class="note">Only lookups that went through AdGuard are listed. Until the hub is behind the CM4, most devices don't use it yet.</p>` : ""}
+    <h3>Blocked now <span class="muted small">(${blocked.length})</span></h3>
+    ${siteTable(dev, blocked, groupOpts)}
+    <h3>Not blocked <span class="muted small">(${notBlocked.length})</span></h3>
+    ${siteTable(dev, notBlocked, groupOpts)}`}
+    <p class="note">Read from the AdGuard query log (kept 7 days) for the device's current IP address. Adding a site uses its main domain, so all its addresses follow the group's rule.</p>
+  </section>` : ""}`;
+}
+
+// --- Saving to the CM4 ---------------------------------------------------------------------------
+// The page edits "state" in place and calls render(); render() notices the change and saves the
+// whole configuration. The CM4 rejects a save based on an older version (another parent saved
+// first); the page then reloads and asks the parent to redo the change.
+const SAVED = ["kids", "groups", "devices", "calendar", "district", "exceptions", "favorites"];
+let savedJSON = null, saving = false, saveTimer = null;
+function persisted() {
+  const out = { version: state.version };
+  for (const k of SAVED) out[k] = state[k];
+  out.devices = state.devices.filter((d) => d.name || d.kid || d.reviewed).map((d) => ({ mac: d.mac, name: d.name || "", kid: d.kid || "", ...(d.reviewed ? { reviewed: true } : {}) }));
+  return out;
+}
+const dataJSON = () => JSON.stringify({ ...persisted(), version: 0 });
+function applyServer(data) {
+  for (const k of SAVED) if (k !== "devices") state[k] = data[k] ?? state[k];
+  state.version = data.version;
+  // Devices carry live fields (IP, last seen, activity) next to the saved name and child
+  // Devices: live rows from /api/devices carry the network facts; the saved list has name and child
+  const stored = new Map((data.devices || []).map((d) => [d.mac, d]));
+  for (const d of state.devices) { const sd = stored.get(d.mac); d.name = sd?.name || ""; d.kid = sd?.kid || null; d.reviewed = !!sd?.reviewed; stored.delete(d.mac); }
+  for (const sd of stored.values()) state.devices.push(liveDevice({ mac: sd.mac, name: sd.name, kid: sd.kid, reviewed: sd.reviewed }));
+  if (!kidById(state.schedKid)) { state.schedKid = state.kids[0]?.id ?? null; state.selRule = null; state.draft = null; }
+  const kid = kidById(state.schedKid);
+  if (kid && !kid.rules.some((r) => r.id === state.selRule)) state.selRule = kid.rules[0]?.id ?? null;
+  savedJSON = dataJSON();
+}
+function saveState(text, cls = "") { const el = $("#savestate"); el.textContent = text; el.className = "save-state small " + cls; }
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: { "Content-Type": "application/json", "X-HH": "1" }, body: body && JSON.stringify(body) });
+  if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+  return { status: r.status, data: await r.json().catch(() => ({})) };
+}
+function scheduleSave() {
+  if (savedJSON === null || dataJSON() === savedJSON) return;
+  saveState("Saving…");
+  clearTimeout(saveTimer); saveTimer = setTimeout(save, 250);
+}
+async function save() {
+  saveTimer = null;
+  if (saving) { saveTimer = setTimeout(save, 250); return; }
+  const sent = dataJSON();
+  if (sent === savedJSON) { saveState("Saved"); return; }
+  saving = true;
+  try {
+    const { status, data } = await api("PUT", "/api/state", persisted());
+    if (status === 200) {
+      if (dataJSON() === sent) { applyServer(data); render(); }
+      else state.version = data.version;      // edited again meanwhile: keep the edit, save it next
+      setTimeout(loadSync, 2500);
+      saveState("Saved");
+    } else if (status === 409) {
+      applyServer(data.state); render(); saveState("Not saved", "bad"); toast(data.error);
+    } else {
+      // Rejected: go back to what the CM4 has
+      const back = JSON.parse(savedJSON); back.version = state.version; applyServer(back); render();
+      saveState("Not saved", "bad"); toast(data.error || "The CM4 did not accept the change");
+    }
+  } catch (e) {
+    saveState("Not saved: CM4 unreachable", "bad"); saveTimer = setTimeout(save, 5000);
+  } finally { saving = false; }
+  if (savedJSON !== null && dataJSON() !== savedJSON && !saveTimer) scheduleSave();
+}
+const liveDevice = (l) => ({ id: l.mac, mac: l.mac, name: l.name || "", kid: l.kid || null, reviewed: !!l.reviewed, host: l.host || "", ip: l.ip || "",
+  side: l.side || "", online: !!l.online, private: !!l.private, firstSeen: l.firstSeen || 0,
+  lastSeen: l.lastSeen ? Math.max(0, Math.round((Date.now() - l.lastSeen) / 60000)) : Infinity });
+// Refresh the network facts; keep this page's names and children (they may be unsaved)
+async function loadDevices() {
+  try {
+    const { status, data } = await api("GET", "/api/devices");
+    if (status !== 200) return;
+    const old = new Map(state.devices.map((d) => [d.mac, d]));
+    state.devices = data.devices.map((l) => { const d = liveDevice(l), o = old.get(l.mac); if (o) { d.name = o.name; d.kid = o.kid; d.reviewed = o.reviewed; } old.delete(l.mac); return d; });
+    for (const o of old.values()) if (o.name || o.kid || o.reviewed) state.devices.push(o);
+    if (state.tab === "today" && savedJSON !== null && !state.draft && !state.kidForm) render();
+    if (state.tab === "devices" && !state.renaming && savedJSON !== null) render();
+  } catch {}
+}
+async function districtCall(path, btn) {
+  if (savedJSON === null || dataJSON() !== savedJSON || saving) { toast("Saving your changes first, try again in a moment"); scheduleSave(); return; }
+  btn.disabled = true;
+  try {
+    const { status, data } = await api("POST", path);
+    if (status !== 200) { toast(data.error || "The CM4 could not do that"); return; }
+    const st = data.state || data;
+    if (dataJSON() === savedJSON) { applyServer(st); render(); }
+    if (path.endsWith("/sync")) toast(data.error ? "Sync failed: " + data.error : (st.district.notices.length ? "Synced: the calendar changed, see the notes below" : "Synced: no changes"));
+  } catch { toast("CM4 unreachable"); } finally { btn.disabled = false; }
+}
+async function loadSync() {
+  try {
+    const { status, data } = await api("GET", "/api/sync");
+    if (status !== 200) return;
+    state.sync = data; syncBanner();
+    if (state.tab === "today" && savedJSON !== null) render();
+  } catch {}
+}
+function syncBanner() {
+  const s = state.sync, el = $("#syncbanner");
+  let msg = "";
+  if (!s || !s.time) msg = "Waiting for the first sync with AdGuard…";
+  else if (!s.ok) msg = "The CM4 could not apply every rule. See the Today tab.";
+  else if (!s.wirelessDevices) msg = "Rules are applied, but no device is behind the CM4 yet (the wireless hub is still on the router), so nothing is blocked in practice.";
+  else if (!s.dnsRedirect) msg = "Rules are applied, but the DNS redirect is off, so devices don't ask AdGuard yet.";
+  el.textContent = msg; el.hidden = !msg;
+}
+function syncPanel() {
+  const s = state.sync;
+  if (!s || !s.time) return "";
+  const t = fmtDate(new Date(s.time));
+  return `<section class="panel">
+    <div class="svc-line" style="justify-content:space-between"><h2>On the CM4</h2>
+      <span class="small ${s.ok ? "muted" : ""}">${s.ok ? `Rules applied at ${t}` : `<b style="color:var(--stop)">Problems at ${t}</b>`}</span></div>
+    ${s.errors.length ? `<ul class="small">${s.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+    <div class="legend">
+      <span>AdGuard: <b>${s.adguard ? "connected" : "not reachable"}</b></span>
+      <span>DNS redirect: <b>${s.dnsRedirect ? "on" : "off"}</b></span>
+      <span>Devices behind the CM4: <b>${s.wirelessDevices}</b></span>
+    </div>
+    <p class="note">The CM4 re-checks the rules every minute and right after each change. Blocked sites stop resolving within about a minute; a video that is already playing may continue until the app reconnects.</p>
+  </section>`;
+}
+// What the CM4 enforces for this child right now (from the last sync)
+function kidSyncLine(kid) {
+  const k = state.sync?.kids?.find((x) => x.id === kid.id);
+  if (!k) return "";
+  if (!k.devices) return `<div class="why">No devices assigned yet: assign them on the Devices tab.</div>`;
+  const what = k.internetBlocked ? "internet off" : k.blockedGroups.length ? "blocking " + k.blockedGroups.map(siteLabel).join(", ") : "nothing blocked";
+  const parts = [k.client ? `${esc(k.client)} (${k.ips.length} IP${k.ips.length > 1 ? "s" : ""}): ${esc(what)}` : "No device IP known yet, nothing applied"];
+  if (k.notBehind) parts.push(`${k.notBehind} of ${k.devices} device${k.devices > 1 ? "s" : ""} not behind the CM4`);
+  return `<div class="why">On the CM4: ${parts.join(" · ")}</div>`;
+}
+
+async function loadCatalog() {
+  try {
+    const { status, data } = await api("GET", "/api/catalog");
+    if (status !== 200 || !data.services?.length) return;
+    CATALOG = Object.fromEntries(data.services.map((x) => [x.id, x.name]));
+    SERVICE_DOMAINS = Object.fromEntries(data.services.map((x) => [x.id, x.domains]));
+    if (savedJSON !== null && !state.draft && !state.kidForm) render();
+  } catch {}
+}
+async function loadActivity() {
+  const mac = state.openDevice, range = state.range;
+  if (!mac) return;
+  state.activity = { mac, range, loading: true }; render();
+  try {
+    const { status, data } = await api("GET", `/api/activity?mac=${encodeURIComponent(mac)}&range=${range}`);
+    if (state.openDevice !== mac || state.range !== range) return;
+    state.activity = status === 200
+      ? { mac, range, ip: data.ip, truncated: data.truncated,
+          rows: data.domains.map((h) => [h.domain, h.n, Math.max(0, Math.round((Date.now() - h.last) / 60000)), h.blocked]) }
+      : { mac, range, error: data.error || "Could not read the activity." };
+  } catch { state.activity = { mac, range, error: "CM4 unreachable." }; }
+  render();
+}
+
+// Pick up changes another parent made, unless this page has unsaved edits
+async function refresh() {
+  if (saving || savedJSON === null || dataJSON() !== savedJSON) return;
+  try {
+    const { status, data } = await api("GET", "/api/state");
+    if (status === 200 && data.version !== state.version && dataJSON() === savedJSON) { applyServer(data); if (!state.draft && !state.kidForm) render(); }
+  } catch {}
+}
+async function load() {
+  const [st, me] = await Promise.all([api("GET", "/api/state"), api("GET", "/api/me")]);
+  $("#me").textContent = me.data.user ? "Signed in as " + me.data.user : "";
+  await Promise.all([loadDevices(), loadSync()]);
+  applyServer(st.data); render(); tick();
+  loadCatalog();
+}
+
+function render() {
+  renderTabs();
+  const v = { today: viewToday, exceptions: viewExceptions, schedule: viewSchedule, groups: viewGroups, days: viewDays, devices: viewDevices }[state.tab];
+  $("#view").innerHTML = v();
+  scheduleSave();
+}
+function tick() { const d = nowDate(); $("#clock").textContent = `${DAYS[d.getDay()]} ${fmtDate(d)}`; }
+
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const ds = b.dataset, kid = kidById(state.schedKid);
+  if (ds.tab) { state.tab = ds.tab; state.draft = null; state.kidForm = null; state.renaming = null; render(); if (ds.tab === "devices") loadDevices(); return; }
+  if (ds.act === "logout") { api("POST", "/api/logout").finally(() => (location.href = "/login")); return; }
+  if (ds.act === "addkid") { state.tab = "schedule"; state.draft = null; state.kidForm = { id: "k" + Date.now().toString(36), name: "", color: COLORS[state.kids.length % COLORS.length], safeSearch: true }; render(); return; }
+  if (ds.act === "editkid") { const k = kidById(state.schedKid); state.kidForm = { id: k.id, name: k.name, color: k.color, safeSearch: k.safeSearch }; render(); return; }
+  if (ds.act === "cancelkid") { state.kidForm = null; render(); return; }
+  if (ds.color) { state.kidForm.name = $("#k-name").value; state.kidForm.safeSearch = $("#k-safe").checked; state.kidForm.color = ds.color; render(); return; }
+  if (ds.act === "delkid") {
+    const kf = state.kidForm;
+    if (!kf.confirmDelete) { kf.name = $("#k-name").value; kf.safeSearch = $("#k-safe").checked; kf.confirmDelete = true; render(); return; }
+    const k = kidById(kf.id);
+    state.kids = state.kids.filter((x) => x !== k);
+    state.exceptions = state.exceptions.filter((x) => x.kid !== k.id);
+    state.favorites = state.favorites.filter((x) => x.kid !== k.id);
+    state.devices.forEach((d) => { if (d.kid === k.id) d.kid = null; });
+    state.kidForm = null; state.schedKid = state.kids[0]?.id ?? null; state.selRule = kidById(state.schedKid)?.rules[0]?.id ?? null;
+    toast(`${k.name} deleted`); render(); return;
+  }
+  if (ds.skid) { state.schedKid = ds.skid; state.draft = null; state.selRule = kidById(ds.skid).rules[0]?.id ?? null; render(); return; }
+  if (ds.selrule) { if (state.draft) readDraft(); state.draft = null; state.selRule = ds.selrule; render(); return; }
+  if (ds.opendev) { state.openDevice = ds.opendev; loadActivity(); return; }
+  if (ds.rename) { state.renaming = ds.rename; render(); document.getElementById("rn-" + ds.rename)?.focus(); return; }
+  if (ds.act === "cancelrename") { state.renaming = null; render(); return; }
+  if (ds.review) { const d = state.devices.find((x) => x.id === ds.review); d.reviewed = true; toast(`${devName(d)} marked as not a child's device`); render(); return; }
+  if (ds.act === "reviewall") { const n = state.devices.filter(isNew); n.forEach((d) => (d.reviewed = true)); toast(`${n.length} device${n.length > 1 ? "s" : ""} marked as not a child's`); render(); return; }
+  if (ds.applyfav) { const f = state.favorites.find((x) => x.id === ds.applyfav); startException(f.kid, [...f.sites], f.open, f.minutes, f.note); render(); return; }
+  if (ds.delfav) { state.favorites = state.favorites.filter((x) => x.id !== ds.delfav); toast("Favorite removed"); render(); return; }
+  if (ds.delex) { const x = state.exceptions.find((y) => y.id === ds.delex); const live = x.from <= Date.now();
+    state.exceptions = state.exceptions.filter((y) => y !== x); toast(live ? "Exception ended" : "Exception deleted"); render(); return; }
+  if (ds.range) { state.range = Number(ds.range); loadActivity(); return; }
+  if (ds.act === "alldev") { state.showAllDevices = !state.showAllDevices; render(); return; }
+  if (ds.goto) { Object.assign(state, { tab: "schedule", schedKid: ds.goto, draft: null, selRule: kidById(ds.goto).rules[0]?.id ?? null }); render(); return; }
+
+  // Rule list
+  if (ds.up !== undefined || ds.down !== undefined) {
+    const i = Number(ds.up ?? ds.down), j = ds.up !== undefined ? i - 1 : i + 1, a = kid.rules;
+    [a[i], a[j]] = [a[j], a[i]]; toast(`${a[j].name} is now rule ${j + 1}`); render(); return;
+  }
+  if (ds.editrule) { state.draft = clone(kid.rules.find((r) => r.id === ds.editrule)); render(); return; }
+  if (ds.act === "addrule") { state.draft = { id: "r" + Date.now(), name: "New rule", dates: ["any"], sites: [], days: {} }; render(); return; }
+  if (ds.act === "canceldraft") { state.draft = null; render(); return; }
+  if (ds.delrule) { const r = kid.rules.find((x) => x.id === ds.delrule); kid.rules = kid.rules.filter((x) => x !== r); state.draft = null; state.selRule = kid.rules[0]?.id ?? null; toast(`Rule “${r.name}” deleted`); render(); return; }
+  if (ds.dwadd) { readDraft(); const d = state.draft.days[ds.dwadd]; const last = d.at(-1); d.push(last ? [Math.min(last[1] + 60, 1380), Math.min(last[1] + 120, 1440)] : [h(16), h(18)]); render(); return; }
+  if (ds.dwall) { readDraft(); state.draft.days[ds.dwall] = [[0, 1440]]; render(); return; }
+  if (ds.dwdel) { readDraft(); const [d, i] = ds.dwdel.split("|"); state.draft.days[d].splice(Number(i), 1); render(); return; }
+  if (ds.dwcopy) {
+    readDraft(); const src = state.draft.days[ds.dwcopy];
+    for (const d of Object.keys(state.draft.days)) state.draft.days[d] = clone(src);
+    toast(`${DAYS[ds.dwcopy]} times copied to the other checked days`); render(); return;
+  }
+
+  // Calendar
+  if (ds.delentry) {
+    const en = allEntries().find((x) => x.id === ds.delentry);
+    if (en.source === "district") { state.district.ignored[en.id] = true; toast(`${en.name} ignored; it stays ignored on the next sync`); }
+    else { state.calendar = state.calendar.filter((x) => x.id !== en.id); toast(`${en.name} removed`); }
+    render(); return;
+  }
+  if (ds.resetentry) { delete state.district.changed[ds.resetentry]; toast("Back to the district's dates"); render(); return; }
+  if (ds.droporphan) { delete state.district.changed[ds.droporphan]; delete state.district.ignored[ds.droporphan]; toast("Edit removed"); render(); return; }
+  if (ds.act === "sync") { districtCall("/api/district/sync", b); return; }
+  if (ds.act === "dismissnotices") { districtCall("/api/district/dismiss", b); return; }
+  if (ds.act === "unignore") { const keep = orphanEdits(); for (const id of Object.keys(state.district.ignored)) if (!keep.includes(id)) delete state.district.ignored[id]; toast("Ignored district entries restored"); render(); return; }
+
+  // Site groups
+  if (ds.delmember) { const [g, i] = ds.delmember.split("|"); const m = groupById(g).members.splice(Number(i), 1)[0]; toast(`${memberLabel(m)} removed from ${groupById(g).name}`); render(); return; }
+  if (ds.delgroup) {
+    const g = groupById(ds.delgroup); state.groups = state.groups.filter((x) => x !== g);
+    state.kids.forEach((k) => k.rules.forEach((r) => (r.sites = r.sites.filter((s) => s !== g.id))));
+    for (const x of [...state.exceptions, ...state.favorites]) x.sites = x.sites.filter((s) => s !== g.id);
+    state.exceptions = state.exceptions.filter((x) => x.sites.length);
+    state.favorites = state.favorites.filter((x) => x.sites.length);
+    state.kids.forEach((k) => (k.rules = k.rules.filter((r) => r.sites.length)));
+    toast(`Group ${g.name} deleted`); render(); return;
+  }
+
+  // Today
+  switch (ds.act) {
+    case "open": override(ds.kid, ds.key, true, ds.min === "tonight" ? "tonight" : Number(ds.min)); break;
+    case "block": override(ds.kid, ds.key, false, "window"); break;
+    case "clear": clearOverride(ds.kid, ds.key); break;
+    case "pause": kidById(ds.kid).paused = true; toast(`Internet paused for ${kidById(ds.kid).name}`); render(); break;
+    case "resume": kidById(ds.kid).paused = false; toast(`Internet resumed for ${kidById(ds.kid).name}`); render(); break;
+  }
+});
+
+document.addEventListener("change", (e) => {
+  if (e.target.id === "sys") { state.showSystem = e.target.checked; render(); return; }
+  if (e.target.classList.contains("r-day")) { readDraft(); render(); return; }
+  const et = e.target.dataset?.entryto;
+  if (et) {
+    const en = allEntries().find((x) => x.id === et);
+    if (en.source === "district") { if (e.target.value === (en.districtTo || en.to)) delete state.district.changed[et]; else state.district.changed[et] = { to: e.target.value }; }
+    else state.calendar.find((x) => x.id === et).to = e.target.value;
+    toast(`${en.name} now ends ${e.target.value}`); render(); return;
+  }
+  const a = e.target.dataset?.assign;
+  if (a) { const d = state.devices.find((x) => x.id === a); d.kid = e.target.value || null;
+    toast(d.kid ? `${devName(d)} now follows ${kidById(d.kid).name}'s rules` : `${devName(d)} is no longer managed`); render(); }
+});
+
+document.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target;
+  if (f.id === "exform") { submitException(); return; }
+  if (f.dataset.rename) {
+    const d = state.devices.find((x) => x.mac === f.dataset.rename), name = f.querySelector("input").value.trim();
+    d.name = name === d.host ? "" : name; state.renaming = null;
+    toast(name ? `Renamed to ${name}` : "Name cleared"); render(); return;
+  }
+  if (f.id === "kidform") {
+    const kf = state.kidForm, name = $("#k-name").value.trim(), safe = $("#k-safe").checked;
+    if (!name) return toast("Enter a name");
+    const k = kidById(kf.id);
+    if (k) Object.assign(k, { name, color: kf.color, safeSearch: safe });
+    else state.kids.push({ id: kf.id, name, color: kf.color, safeSearch: safe, paused: false, rules: [] });
+    state.kidForm = null; state.schedKid = kf.id; state.selRule = kidById(kf.id).rules[0]?.id ?? null;
+    toast(k ? `${name} saved` : `${name} added. Add rules here, then assign devices on the Devices tab.`); render(); return;
+  }
+  if (f.id === "ruleform") {
+    readDraft(); const r = state.draft, kid = kidById(state.schedKid);
+    if (!r.dates.length) { toast("Pick at least one date option"); return; }
+    if (!r.sites.length) { toast("Pick at least one site group or Internet"); return; }
+    if (!Object.keys(r.days).length) { toast("Check at least one day of the week"); return; }
+    for (const [d, wins] of Object.entries(r.days)) for (let i = 0; i < wins.length; i++) {
+      if (wins[i][0] >= wins[i][1]) { toast(`${DAYS[d]}: a time must end after it starts`); return; }
+      if (i && wins[i][0] < wins[i - 1][1]) { toast(`${DAYS[d]}: times overlap`); return; }
+    }
+    const i = kid.rules.findIndex((x) => x.id === r.id);
+    if (i < 0) kid.rules.unshift(r); else kid.rules[i] = r;
+    state.draft = null; state.selRule = r.id; toast(`Rule “${r.name}” saved${i < 0 ? " as rule 1" : ""}`); render(); return;
+  }
+  if (f.dataset.addsite) { addSite(f.querySelector("select").value, f.dataset.addsite); return; }
+  if (f.dataset.addmember) {
+    const g = groupById(f.dataset.addmember), raw = document.getElementById(`m-${g.id}`).value.trim();
+    const svc = Object.entries(CATALOG).find(([, l]) => l.toLowerCase() === raw.toLowerCase());
+    const m = svc ? { kind: "service", id: svc[0] } : { kind: "site", id: raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase() };
+    for (const other of state.groups) other.members = other.members.filter((x) => !(x.kind === m.kind && x.id === m.id));
+    g.members.push(m); toast(`${memberLabel(m)} added to ${g.name}`); render();
+  } else if (f.id === "groupform") {
+    const name = $("#g-name").value.trim();
+    state.groups.push({ id: "g" + Date.now(), name, members: [] });
+    toast(`Group ${name} created. Add a rule on the Schedules tab to limit it.`); render();
+  } else if (f.id === "dayform") {
+    const from = $("#c-from").value, to = $("#c-to").value;
+    state.calendar.push({ id: "m" + Date.now(), name: $("#c-name").value.trim(), from, to: to && to > from ? to : from, kind: $("#c-kind").value, source: "manual" });
+    toast(`${$("#c-name").value.trim()} added`); render();
+  }
+});
+
+tick();
+load().catch(() => saveState("CM4 unreachable", "bad"));
+setInterval(() => { tick(); if (state.tab === "today" && savedJSON !== null) render(); }, 30000);
+setInterval(() => { refresh(); loadDevices(); loadSync(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>

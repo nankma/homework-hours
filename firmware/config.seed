@@ -1,0 +1,16 @@
+# Appended to the existing .config, then `make defconfig`.
+# Package-only build: everything is =m (built as .apk, not baked into the image) and nothing
+# here may change the kernel config, so the kernel vermagic stays equal to the one running on
+# the CM4 and the packages install with plain `apk add`.
+# Do NOT add kmod-br-netfilter / kmod-nft-bridge here: they change the kernel config.
+
+CONFIG_PACKAGE_adguardhome=m
+CONFIG_PACKAGE_curl=m
+CONFIG_PACKAGE_ip-bridge=m
+CONFIG_PACKAGE_tcpdump-mini=m
+CONFIG_PACKAGE_fdisk=m
+
+# OpenAppFilter (for a later experiment)
+CONFIG_PACKAGE_kmod-oaf=m
+CONFIG_PACKAGE_appfilter=m
+CONFIG_PACKAGE_luci-app-oaf=m

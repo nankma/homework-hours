@@ -1,0 +1,6 @@
+# Public SSH key(s) allowed to log in to the CM4 as root, one per line. Copy this file to
+# authorized_keys (same folder) and replace the line below with YOUR public key, e.g. the
+# contents of ~/.ssh/cm4pi_rsa.pub after: ssh-keygen -t rsa -b 4096 -f ~/.ssh/cm4pi_rsa
+# (use RSA: Windows OpenSSH fails with ed25519 against this dropbear).
+# 99-cm4-bridge turns SSH password login off only when a key is present here.
+# ssh-rsa AAAAB3NzaC1yc2E...your-public-key... you@your-pc   <- replace this line with your key (no leading #)

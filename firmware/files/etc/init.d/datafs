@@ -1,0 +1,26 @@
+#!/bin/sh /etc/rc.common
+# Mounts the data partition (ext4, label "data", SD card partition 3) at /mnt/data before
+# AdGuard Home (START=19) starts. AdGuard's work dir (query log, statistics) lives there.
+# If the partition is missing (e.g. a reflash rewrote the partition table), a small tmpfs is
+# mounted instead, so AdGuard writes to RAM and never fills the small (~38 MB free) root overlay.
+# Re-create a lost partition entry with: fdisk /dev/mmcblk0 → n, p, 3, start 360448, end default.
+
+START=13	# after logd (12), before AdGuard Home (19)
+
+DEV=/dev/mmcblk0p3
+MNT=/mnt/data
+
+start() {
+	mkdir -p "$MNT"
+	grep -q " $MNT " /proc/mounts && return 0
+	if [ -b "$DEV" ] && mount -t ext4 -o noatime "$DEV" "$MNT"; then
+		logger -t datafs "mounted $DEV on $MNT"
+	else
+		mount -t tmpfs -o size=64m tmpfs "$MNT"
+		logger -p daemon.err -t datafs "$DEV not mounted; using a 64 MB tmpfs on $MNT (data is lost on reboot)"
+	fi
+}
+
+stop() {
+	return 0	# unmounted by the system at shutdown
+}

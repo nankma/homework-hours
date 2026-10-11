@@ -1,0 +1,48 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+EXTRA_COMMANDS="trial confirm"
+EXTRA_HELP="	trial [sec]	Apply rules, auto-revert after sec (default 90) unless confirmed
+	confirm		Keep the rules applied by 'trial'"
+
+TEMPLATE=/usr/share/parentalcontrol/dns-redirect.nft.in
+RENDERED=/var/run/pc-dns.nft
+TRIAL_FLAG=/var/run/pc-trial
+
+render_dns() {
+	local port macs src=""
+	port=$(uci -q get parentalcontrol.dns.port)
+	macs=$(uci -q get parentalcontrol.dns.only_mac | tr ' ' ',')
+	[ -n "$macs" ] && src="ether saddr { $macs } "
+	sed -e "s/@BRMAC@/$(cat /sys/class/net/br-lan/address)/g" \
+		-e "s/@SRC@/$src/g" \
+		-e "s/@PORT@/${port:-5353}/g" "$TEMPLATE" > "$RENDERED"
+}
+
+start() {
+	[ "$(uci -q get parentalcontrol.dns.enabled)" = 1 ] || return 0
+	render_dns
+	nft -f "$RENDERED"
+}
+
+stop() {
+	nft delete table bridge pc_dns 2>/dev/null
+	nft delete table inet pc_dns 2>/dev/null
+	return 0
+}
+
+trial() {
+	local sec="${1:-90}"
+	start || return 1
+	touch "$TRIAL_FLAG"
+	( sleep "$sec"; [ -f "$TRIAL_FLAG" ] && /etc/init.d/parentalcontrol stop && rm -f "$TRIAL_FLAG" \
+		&& logger -t parentalcontrol "trial not confirmed, rules reverted" ) </dev/null >/dev/null 2>&1 &
+	echo "Applied; reverting in ${sec}s unless '/etc/init.d/parentalcontrol confirm'"
+}
+
+confirm() {
+	rm -f "$TRIAL_FLAG"
+	echo "Confirmed"
+}
