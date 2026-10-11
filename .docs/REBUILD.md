@@ -185,6 +185,9 @@ the vermagic changes and kmods stop matching the running kernel. The design does
      `upstream_mode: parallel`; `bootstrap_dns`: `9.9.9.10`, `149.112.112.10`, `2620:fe::10`,
      `2620:fe::fe:10`; `fallback_dns: [192.168.0.1]`
    - `filtering.blocked_services.schedule.time_zone: America/Los_Angeles`
+   - `filters`: set `enabled: false` on every blocklist (the wizard turns on the AdGuard DNS
+     filter). Homework Hours only needs per-client settings and user rules; ad blocking is left
+     to browser extensions, so sites with ad-block detection keep working.
    - `user_rules: ['||use-application-dns.net^$dnsrewrite=NXDOMAIN']` (turns off Firefox's
      automatic DoH)
    - query log `interval: 7d`, statistics `interval: 14d` (see step 7b)

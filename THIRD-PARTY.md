@@ -15,7 +15,7 @@ its HTTP API.
 | OpenAppFilter (built, not installed) | GPL-2.0 | https://github.com/destan19/OpenAppFilter (commit in `firmware/feeds.conf.pinned`) |
 | Raspberry Pi boot firmware (Broadcom binaries in the OpenWrt image) | Redistributable in binary form for Raspberry Pi devices only; notice must be reproduced | https://github.com/raspberrypi/firmware (`boot/LICENCE.broadcom`) |
 | Go standard library (compiled into the app binary) | BSD-3-Clause | https://go.dev |
-| AdGuard Home filter lists (downloaded at run time) | Each list's own license (e.g. AdGuard DNS filter, AdAway Default Blocklist) | links in `.docs/reference/adguardhome.yaml` |
+| AdGuard Home filter lists (off in this setup; downloaded at run time if enabled) | Each list's own license (e.g. AdGuard DNS filter, AdAway Default Blocklist) | links in `.docs/reference/adguardhome.yaml` |
 
 Product names (OpenWrt, AdGuard, Raspberry Pi, Waveshare) are trademarks of their owners and
 are used here only to describe compatibility; no endorsement is implied.

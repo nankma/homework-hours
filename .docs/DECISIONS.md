@@ -91,3 +91,9 @@ Newest last. "Rejected" lists what was considered and why it lost.
 - The app only talks to AdGuard Home over HTTP and to nftables via `nft`, so it is a separate
   work from those GPL components; modifying them or writing kernel modules (e.g. for
   OpenAppFilter) would bring GPL-2.0/3.0 obligations for that part.
+
+## 2026-10-10 No ad blocklists in AdGuard Home
+- **Blocklists off; AdGuard Home only does parental control** (per-client blocked services,
+  user rules, adult filter, safe search). The default AdGuard DNS filter blocked ads for every
+  wireless device, which set off "disable your ad blocker" walls and broke tracking links.
+  Ad blocking is left to each browser's extension, where the user can turn it off per site.

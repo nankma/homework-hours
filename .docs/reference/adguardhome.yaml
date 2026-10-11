@@ -114,7 +114,7 @@ statistics:
   enabled: true
   ignored_enabled: false
 filters:
-  - enabled: true
+  - enabled: false
     url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
     name: AdGuard DNS filter
     id: 1

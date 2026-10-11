@@ -12,7 +12,7 @@ Homework Hours enforces the parents' rules. Everything comes back on its own aft
 |---|---|
 | Bridge (`firmware/files/etc/uci-defaults/99-cm4-bridge`) | br-lan = eth0 + eth1, STP, `192.168.0.2/24`, DHCP/RA off, Wi-Fi off, TZ Los Angeles, SSH key-only |
 | Extra packages | adguardhome, curl, ip-bridge, tcpdump-mini, fdisk. OpenAppFilter built but not installed |
-| AdGuard Home 0.107.78 | DNS :5353; UI/API on 127.0.0.1:3000 only (SSH tunnel). Users `admin` (parent), `pcapi` (app). Clients: one `HH <child>` per child, managed by the app |
+| AdGuard Home 0.107.78 | DNS :5353; UI/API on 127.0.0.1:3000 only (SSH tunnel). Users `admin` (parent), `pcapi` (app). Clients: one `HH <child>` per child, managed by the app. No ad blocklists (ad blocking is left to browsers) |
 | DNS redirect (`parentalcontrol`) | Enabled at boot; nft tables `bridge pc_dns` + `inet pc_dns` |
 | LuCI (uhttpd) | 127.0.0.1 only (SSH tunnel) |
 | homework-hours | Enabled at boot, `:8443`; steps 1–5 deployed |
