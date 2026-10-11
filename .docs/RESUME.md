@@ -1,6 +1,6 @@
 # Resuming in a new session
 
-1. Read, in order: `README.md` → `STATUS.md` → the work list (local, see below) → the
+1. Read, in order: `../README.md` → `STATUS.md` → the work list (local, see below) → the
    relevant part of `DESIGN.md`. `DECISIONS.md` explains why things are the way they are;
    don't re-open settled decisions unless the user does.
 2. Working agreements with the user:

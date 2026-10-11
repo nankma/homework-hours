@@ -4,8 +4,8 @@ Waveshare CM4-DUAL-ETH-BASE running OpenWrt SNAPSHOT r35679 (kernel 6.12.100, aa
 package manager `apk`). It is a transparent L2 bridge between the home router (Q1000K, 1G LAN
 port) and the wireless hub, and runs the Homework Hours parental-control app.
 
-**Start with `.docs/RESUME.md`.** Project docs live in `.docs/` (README, DESIGN, STATUS,
-DECISIONS, OPERATIONS, REBUILD, DATA-AND-API); `firmware/README.md` explains the firmware files.
+**Start with `.docs/RESUME.md`.** The overview is `README.md`; project docs live in `.docs/`
+(DESIGN, STATUS, DECISIONS, OPERATIONS, REBUILD, DATA-AND-API); `firmware/README.md` explains the firmware files.
 Keep `STATUS.md` current when things change. Machine-specific notes (paths, users, local-only
 files, the work list) are in `CLAUDE.local.md` when present.
 
