@@ -23,6 +23,9 @@ var (
 	favoriteLength = map[int]bool{30: true, 60: true, 120: true, 180: true, 240: true, 360: true, 720: true}
 )
 
+// Profiles nest at most this many levels (top level = 1).
+const maxDepth = 4
+
 // Longest exception the page offers, plus slack for clock differences between phone and CM4.
 const maxExceptionMs = (12*60 + 5) * 60 * 1000
 
@@ -49,7 +52,7 @@ func validDate(s string) bool {
 // time windows sorted, expired exceptions dropped, and only the newest exception per child kept.
 // It returns a message a parent can read.
 func validateState(st *State, now time.Time) error {
-	if len(st.Kids) > 20 || len(st.Groups) > 50 || len(st.Calendar) > 500 || len(st.Favorites) > 100 {
+	if len(st.Kids) > 50 || len(st.Groups) > 50 || len(st.Calendar) > 500 || len(st.Favorites) > 100 {
 		return fmt.Errorf("too many entries")
 	}
 
@@ -136,10 +139,10 @@ func validateState(st *State, now time.Time) error {
 		k := &st.Kids[i]
 		k.Name = cleanText(k.Name, 40)
 		if !reID.MatchString(k.ID) || kids[k.ID] {
-			return fmt.Errorf("bad child id %q", k.ID)
+			return fmt.Errorf("bad profile id %q", k.ID)
 		}
 		if k.Name == "" {
-			return fmt.Errorf("a child needs a name")
+			return fmt.Errorf("a profile needs a name")
 		}
 		if !reColor.MatchString(k.Color) {
 			k.Color = "#3f7d6e"
@@ -199,6 +202,10 @@ func validateState(st *State, now time.Time) error {
 				}
 			}
 		}
+	}
+
+	if err := validTree(st.Kids); err != nil {
+		return err
 	}
 
 	nowMs := now.UnixMilli()
@@ -263,6 +270,32 @@ func validateState(st *State, now time.Time) error {
 	for i := range st.Groups {
 		if st.Groups[i].Members == nil {
 			st.Groups[i].Members = []Member{}
+		}
+	}
+	return nil
+}
+
+// validTree checks that every parent exists, there are no loops, and the tree is at most
+// maxDepth levels deep.
+func validTree(kids []Kid) error {
+	byID := map[string]Kid{}
+	for _, k := range kids {
+		byID[k.ID] = k
+	}
+	for _, k := range kids {
+		depth, cur := 1, k
+		for cur.Parent != "" {
+			p, ok := byID[cur.Parent]
+			if !ok {
+				return fmt.Errorf("%s is inside a profile that doesn't exist", k.Name)
+			}
+			if p.ID == k.ID {
+				return fmt.Errorf("%s can't be inside itself", k.Name)
+			}
+			if depth++; depth > maxDepth {
+				return fmt.Errorf("profiles can be nested at most %d levels deep", maxDepth)
+			}
+			cur = p
 		}
 	}
 	return nil

@@ -97,3 +97,13 @@ Newest last. "Rejected" lists what was considered and why it lost.
   user rules, adult filter, safe search). The default AdGuard DNS filter blocked ads for every
   wireless device, which set off "disable your ad blocker" walls and broke tracking links.
   Ad blocking is left to each browser's extension, where the user can turn it off per site.
+
+## 2026-11-23 Profiles form a tree
+- **Children become profiles that can be nested** ("Kids" → "Leo", "Sam"), so one set of
+  family rules covers both children and an exception can still go to one child. Nearest wins:
+  own exception, then the parent's; own rules, then the parent's (first match decides). Pause
+  and safe search are inherited (any level on → on).
+  Rejected: "strictest wins" (any level blocks → blocked), because a child could then never get
+  more than the family rules allow; separate device groups next to children, because rules
+  would then come from two places.
+- The JSON keeps the name `kids` (one new field, `parent`) so existing settings load unchanged.

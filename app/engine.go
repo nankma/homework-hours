@@ -9,14 +9,34 @@ import (
 
 // Engine evaluates the rules exactly like the page (status() in web/index.html):
 // paused → exception → first matching rule → allowed. If Internet is blocked, every group is.
+// Profiles form a tree: each step looks at the profile first, then the profiles above it.
 type Engine struct {
 	st      State
 	entries []CalEntry
 	now     time.Time // in the household's time zone
+	byID    map[string]Kid
 }
 
 func newEngine(st State, now time.Time) *Engine {
-	return &Engine{st: st, entries: append(districtEntries(st.District), st.Calendar...), now: now}
+	e := &Engine{st: st, entries: append(districtEntries(st.District), st.Calendar...), now: now, byID: map[string]Kid{}}
+	for _, k := range st.Kids {
+		e.byID[k.ID] = k
+	}
+	return e
+}
+
+// chain is k followed by the profiles above it, nearest first. A missing parent or a loop
+// (validation forbids both) ends the chain.
+func (e *Engine) chain(k Kid) []Kid {
+	out := []Kid{k}
+	for len(out) <= maxDepth {
+		p, ok := e.byID[out[len(out)-1].Parent]
+		if !ok || slices.ContainsFunc(out, func(x Kid) bool { return x.ID == p.ID }) {
+			break
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func (e *Engine) entriesOn(day string) []CalEntry {
@@ -52,12 +72,21 @@ func (e *Engine) dateMatches(r Rule) bool {
 	return false
 }
 
+// rules is the inherited rule list: the profile's own rules, then its parent's, and so on.
+func (e *Engine) rules(k Kid) []Rule {
+	var out []Rule
+	for _, p := range e.chain(k) {
+		out = append(out, p.Rules...)
+	}
+	return out
+}
+
 // windowOpen: the first rule (top to bottom) that covers key, today's weekday and today's date
 // decides; no such rule means open.
 func (e *Engine) windowOpen(k Kid, key string) (open bool, rule string) {
 	dow := strconv.Itoa(int(e.now.Weekday()))
 	t := e.now.Hour()*60 + e.now.Minute()
-	for _, r := range k.Rules {
+	for _, r := range e.rules(k) {
 		wins, ok := r.Days[dow]
 		if !ok || !slices.Contains(r.Sites, key) || !e.dateMatches(r) {
 			continue
@@ -72,20 +101,37 @@ func (e *Engine) windowOpen(k Kid, key string) (open bool, rule string) {
 	return true, ""
 }
 
+// exception: the nearest profile (own first, then upward) with a live exception covering key
+// decides; within one profile the last one listed wins.
 func (e *Engine) exception(k Kid, key string) *Exception {
 	ms := e.now.UnixMilli()
-	var found *Exception
-	for i, x := range e.st.Exceptions {
-		if x.Kid == k.ID && x.Until > ms && x.From <= ms && slices.Contains(x.Sites, key) {
-			found = &e.st.Exceptions[i]
+	for _, p := range e.chain(k) {
+		var found *Exception
+		for i, x := range e.st.Exceptions {
+			if x.Kid == p.ID && x.Until > ms && x.From <= ms && slices.Contains(x.Sites, key) {
+				found = &e.st.Exceptions[i]
+			}
+		}
+		if found != nil {
+			return found
 		}
 	}
-	return found
+	return nil
+}
+
+// Paused: the profile or one above it is paused.
+func (e *Engine) Paused(k Kid) bool {
+	return slices.ContainsFunc(e.chain(k), func(p Kid) bool { return p.Paused })
+}
+
+// SafeSearch: on for the profile or one above it.
+func (e *Engine) SafeSearch(k Kid) bool {
+	return slices.ContainsFunc(e.chain(k), func(p Kid) bool { return p.SafeSearch })
 }
 
 // Blocked reports whether key ("internet" or a group id) is blocked for k now, and why.
 func (e *Engine) Blocked(k Kid, key string) (bool, string) {
-	if k.Paused {
+	if e.Paused(k) {
 		return true, "paused"
 	}
 	if key != "internet" {
@@ -114,12 +160,13 @@ type KidPlan struct {
 	Services        []string // AdGuard blocked-service ids
 	Sites           []string // domains
 	Adult           bool     // AdGuard parental (adult content) filter
+	SafeSearch      bool     // own or inherited
 }
 
 func (e *Engine) Plan() []KidPlan {
 	var plans []KidPlan
 	for _, k := range e.st.Kids {
-		p := KidPlan{Kid: k}
+		p := KidPlan{Kid: k, SafeSearch: e.SafeSearch(k)}
 		p.InternetBlocked, _ = e.Blocked(k, "internet")
 		for _, g := range e.st.Groups {
 			if b, _ := e.Blocked(k, g.ID); !b {

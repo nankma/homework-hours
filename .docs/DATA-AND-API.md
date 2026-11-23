@@ -8,8 +8,9 @@ Whole configuration in one versioned JSON document. Go types: `app/store.go`; ch
 ```jsonc
 {
   "version": 7,                       // +1 on every save; clients send the version they edited
-  "kids": [{
+  "kids": [{                          // profiles: a child, or a group of profiles (DESIGN §1)
     "id": "k1abc", "name": "Maya", "color": "#3f7d6e",   // color: #rrggbb
+    "parent": "kfam",                  // profile this one is inside; missing = top level
     "safeSearch": true, "paused": false,
     "rules": [{                        // ordered; first match wins per site group
       "id": "r1", "name": "Video after school",
@@ -49,6 +50,7 @@ Whole configuration in one versioned JSON document. Go types: `app/store.go`; ch
 ```
 
 Server-side rules on save (`validateState` + `Store.Replace`):
+- Profiles: every `parent` must exist, no loops, at most 4 levels.
 - Ids `^[A-Za-z0-9_-]{1,40}$`, unique per list; `internet` is reserved. Names trimmed, control
   characters removed, length-capped.
 - Rule/exception/favorite sites must name existing groups or `internet`; rules need ≥1 date,
@@ -60,7 +62,7 @@ Server-side rules on save (`validateState` + `Store.Replace`):
   or that were already stored; only entries with a name, a child or `reviewed` are kept. Kids that no
   longer exist are unassigned.
 - `district.lastSync`, `lastAttempt`, `lastError`, `feed` and `notices` are kept from the server.
-- Limits: 20 kids, 50 groups, 500 members/group, 50 rules/kid, 500 calendar entries, 100
+- Limits: 50 profiles, 50 groups, 500 members/group, 50 rules/kid, 500 calendar entries, 100
   favorites, body ≤ 1 MiB.
 
 District entries are derived from `district.feed` by the same expansion in Go

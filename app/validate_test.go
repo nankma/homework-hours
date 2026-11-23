@@ -55,6 +55,17 @@ func TestValidateRejects(t *testing.T) {
 		"bad length":     func(s *State) { s.Favorites[0].Minutes = 45 },
 		"long exception": func(s *State) { s.Exceptions[0].Until = s.Exceptions[0].From + 24*3600000 },
 		"dup kid":        func(s *State) { s.Kids = append(s.Kids, s.Kids[0]) },
+		"unknown parent": func(s *State) { s.Kids[0].Parent = "ghost" },
+		"own parent":     func(s *State) { s.Kids[0].Parent = "k1" },
+		"loop": func(s *State) {
+			s.Kids[0].Parent = "k2"
+			s.Kids = append(s.Kids, Kid{ID: "k2", Name: "Kids", Parent: "k1"})
+		},
+		"too deep": func(s *State) {
+			s.Kids[0].Parent = "a"
+			s.Kids = append(s.Kids, Kid{ID: "a", Name: "A", Parent: "b"}, Kid{ID: "b", Name: "B", Parent: "c"},
+				Kid{ID: "c", Name: "C", Parent: "d"}, Kid{ID: "d", Name: "D"})
+		},
 		"bad calendar": func(s *State) {
 			s.Calendar = []CalEntry{{ID: "c1", Name: "x", From: "2027-01-05", To: "2027-01-01", Kind: "break"}}
 		},
@@ -94,5 +105,15 @@ func TestReplaceVersions(t *testing.T) {
 	s2, err := openStore(s.path)
 	if err != nil || s2.Snapshot().Version != 1 {
 		t.Errorf("reopen: %v %+v", err, s2.Snapshot().Version)
+	}
+}
+
+func TestValidateTree(t *testing.T) {
+	now := time.Now()
+	st := sampleState(now)
+	st.Kids[0].Parent = "a"
+	st.Kids = append(st.Kids, Kid{ID: "a", Name: "A", Parent: "b"}, Kid{ID: "b", Name: "B", Parent: "c"}, Kid{ID: "c", Name: "C"})
+	if err := validateState(&st, now); err != nil {
+		t.Errorf("4 levels must be fine: %v", err)
 	}
 }

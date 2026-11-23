@@ -148,7 +148,7 @@ func (e *Enforcer) reconcile() {
 	for _, p := range plans {
 		ks := KidStatus{ID: p.Kid.ID, IPs: []string{}, InternetBlocked: p.InternetBlocked,
 			BlockedGroups: nonNil(p.BlockedGroups), Services: nonNil(p.Services), Sites: nonNil(p.Sites),
-			Adult: p.Adult, SafeSearch: p.Kid.SafeSearch}
+			Adult: p.Adult, SafeSearch: p.SafeSearch}
 		for _, d := range st.Devices {
 			if d.Kid != p.Kid.ID {
 				continue
@@ -211,7 +211,7 @@ func nonNil(s []string) []string {
 }
 
 func desiredClient(name string, ips []string, p KidPlan, loc *time.Location) Client {
-	ss := p.Kid.SafeSearch
+	ss := p.SafeSearch
 	return Client{
 		Name: name, IDs: ips,
 		UseGlobalSettings: false, FilteringEnabled: true, ParentalEnabled: p.Adult, SafebrowsingEnabled: false,

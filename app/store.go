@@ -21,8 +21,11 @@ type State struct {
 	Favorites  []Favorite  `json:"favorites"`
 }
 
+// Kid is a profile: a child, or a group of profiles when other profiles name it as Parent.
+// The tree is at most maxDepth levels deep; see DESIGN §1 for how settings are inherited.
 type Kid struct {
 	ID         string `json:"id"`
+	Parent     string `json:"parent,omitempty"` // "" = top level
 	Name       string `json:"name"`
 	Color      string `json:"color"`
 	SafeSearch bool   `json:"safeSearch"`

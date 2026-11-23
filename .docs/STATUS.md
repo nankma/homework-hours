@@ -1,4 +1,4 @@
-# Status (as of 2026-10-10)
+# Status (as of 2026-11-23)
 
 Live. The wireless hub is behind the CM4, all wireless DNS goes through AdGuard Home, and
 Homework Hours enforces the parents' rules. Everything comes back on its own after a reboot
@@ -12,7 +12,7 @@ Homework Hours enforces the parents' rules. Everything comes back on its own aft
 |---|---|
 | Bridge (`firmware/files/etc/uci-defaults/99-cm4-bridge`) | br-lan = eth0 + eth1, STP, `192.168.0.2/24`, DHCP/RA off, Wi-Fi off, TZ Los Angeles, SSH key-only |
 | Extra packages | adguardhome, curl, ip-bridge, tcpdump-mini, fdisk. OpenAppFilter built but not installed |
-| AdGuard Home 0.107.78 | DNS :5353; UI/API on 127.0.0.1:3000 only (SSH tunnel). Users `admin` (parent), `pcapi` (app). Clients: one `HH <child>` per child, managed by the app. No ad blocklists (ad blocking is left to browsers) |
+| AdGuard Home 0.107.78 | DNS :5353; UI/API on 127.0.0.1:3000 only (SSH tunnel). Users `admin` (parent), `pcapi` (app). Clients: one `HH <profile>` per profile with devices, managed by the app. No ad blocklists (ad blocking is left to browsers) |
 | DNS redirect (`parentalcontrol`) | Enabled at boot; nft tables `bridge pc_dns` + `inet pc_dns` |
 | LuCI (uhttpd) | 127.0.0.1 only (SSH tunnel) |
 | homework-hours | Enabled at boot, `:8443`; steps 1–5 deployed |
@@ -30,6 +30,9 @@ Homework Hours enforces the parents' rules. Everything comes back on its own aft
   exception overrides it, a block exception blocks on its own.
 - **Step 5:** school district calendar synced at startup and 03:00 daily, real break ranges,
   change notices, "Sync now".
+- **Profiles form a tree** (e.g. "Kids" with each child inside): a profile follows its own
+  exception and rules first, then those of the profiles above it; pause and safe search are
+  inherited. Devices can belong to any profile.
 - **New devices** (a child's device whose MAC changed) are highlighted on the Devices tab.
 - Children's devices use their hardware MAC (private Wi-Fi address off).
 

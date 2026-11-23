@@ -20,6 +20,19 @@
   open times*. Rules are checked top to bottom; for each site group the first matching rule
   decides. No matching rule → allowed. A weekday left unchecked means the rule doesn't apply
   that day. Internet blocked → every site blocked.
+- **Profiles form a tree.** A profile is a child or a group of profiles (e.g. "Kids" with
+  "Leo" and "Sam" under it), at most 4 levels deep. Every profile has its own rules,
+  exception, favorites, pause and safe search; a device belongs to exactly one profile, at any
+  level (a shared tablet can sit on "Kids"). What applies to a profile, nearest first:
+  - **Pause:** the profile or any profile above it is paused → all internet off.
+  - **Safe search:** on if it is on for the profile or any profile above it.
+  - **Exception:** the nearest live exception (own first, then upward) that covers the site
+    group decides. So an exception for "Leo" beats one for "Kids", and an exception for
+    "Kids" reaches both children. Exceptions beat rules at every level.
+  - **Rules:** the profile's own rules first, then its parent's, and so on up; the first rule
+    that matches decides, as before. A child's own rule overrides the family rule for the same
+    site group; groups the child has no rule for follow the family rules.
+  - Deleting a profile moves its sub-profiles and devices up one level.
 - **Site groups** bundle AdGuard catalog services (YouTube, TikTok…), websites (domains) and
   categories (adult content). A domain belongs to at most one group; a hand-added website wins
   over a service that also covers it.
@@ -211,8 +224,10 @@ AdGuard's own `blocked_services_schedule` is **not** used (one range per day, se
 calendar, no exceptions); it is cleared on our clients.
 
 ### Translation
-Per child, evaluate now: paused → exception → first matching rule → default allow, for Internet
-and every group. Then:
+Per profile, evaluate now: paused (own or above) → nearest exception (own, then upward) →
+first matching rule in the inherited list (own rules, then the parent's, …) → default allow,
+for Internet and every group. Every profile with a device of its own gets its own client;
+devices of sub-profiles are not in it (they get their sub-profile's client). Then:
 
 | Our setting | AdGuard / CM4 |
 |---|---|

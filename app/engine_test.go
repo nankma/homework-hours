@@ -138,3 +138,69 @@ func TestPlanAndRules(t *testing.T) {
 		t.Errorf("nft:\n%s", nft)
 	}
 }
+
+// Family profile "Kids" with Leo and Sam under it; a shared tablet sits on "Kids".
+func TestEngineProfileTree(t *testing.T) {
+	st := engineState()
+	family := st.Kids[0]
+	family.ID, family.Name, family.SafeSearch = "kids", "Kids", true
+	leo := Kid{ID: "leo", Name: "Leo", Parent: "kids", Rules: []Rule{
+		// Leo may play games in the evening; video follows the family rules
+		{ID: "d1", Name: "Games", Dates: []string{"any"}, Sites: []string{"games"}, Days: map[string][][2]int{"2": {{18 * 60, 20 * 60}}}},
+		// and gets video until 18:00 on Tuesdays, overriding the family's 17:00–20:00
+		{ID: "d2", Name: "Video", Dates: []string{"any"}, Sites: []string{"video"}, Days: map[string][][2]int{"2": {{15 * 60, 18 * 60}}}},
+	}}
+	sam := Kid{ID: "sam", Name: "Sam", Parent: "kids"}
+	st.Kids = []Kid{family, leo, sam}
+	e := func(when string) *Engine { return newEngine(st, at(when)) }
+	is := func(when string, k Kid, key string) bool { b, _ := e(when).Blocked(k, key); return b }
+
+	// Own rule first, then the family's
+	if is("2026-10-13 15:30", leo, "video") || !is("2026-10-13 15:30", sam, "video") {
+		t.Error("Leo's own video rule must win over the family rule; Sam follows the family")
+	}
+	if !is("2026-10-13 18:30", leo, "video") || is("2026-10-13 18:30", sam, "video") {
+		t.Error("18:30: Leo's own rule closed video, the family rule is open for Sam")
+	}
+	if is("2026-10-13 18:30", leo, "games") || !is("2026-10-13 17:00", leo, "games") {
+		t.Error("Leo's games window is 18:00–20:00")
+	}
+	if !is("2026-10-13 15:30", leo, "adult") || !is("2026-10-13 22:00", leo, "internet") {
+		t.Error("family adult and bedtime rules must reach Leo")
+	}
+	// Inherited safe search
+	if !e("2026-10-13 15:30").SafeSearch(sam) {
+		t.Error("safe search is on for Kids, so for Sam too")
+	}
+	// Exceptions: one for Kids reaches both; Leo's own beats it
+	now := at("2026-10-13 15:30")
+	ms := now.UnixMilli()
+	st.Exceptions = []Exception{{ID: "x1", Kid: "kids", Sites: []string{"video"}, Open: true, From: ms - 1, Until: ms + 3600000}}
+	if is("2026-10-13 15:30", sam, "video") {
+		t.Error("an exception on Kids must open video for Sam")
+	}
+	st.Exceptions = append(st.Exceptions, Exception{ID: "x2", Kid: "leo", Sites: []string{"video"}, Open: false, From: ms - 1, Until: ms + 3600000})
+	if !is("2026-10-13 15:30", leo, "video") || is("2026-10-13 15:30", sam, "video") {
+		t.Error("Leo's own block exception wins for him; Sam keeps the family exception")
+	}
+	// An exception for Leo only covers what it names; games still follow the rules
+	if !is("2026-10-13 15:30", leo, "games") {
+		t.Error("games are not in any exception and closed by Leo's rule")
+	}
+	// Pausing Kids pauses everyone under it
+	st.Exceptions = nil
+	st.Kids[0].Paused = true
+	if b, why := e("2026-10-13 18:30").Blocked(sam, "internet"); !b || why != "paused" {
+		t.Error("pausing Kids must pause Sam")
+	}
+	// Plans: one per profile, with inherited safe search
+	plans := e("2026-10-13 15:30").Plan()
+	if len(plans) != 3 || !plans[2].SafeSearch || !plans[2].InternetBlocked {
+		t.Errorf("plans: %+v", plans)
+	}
+	// A broken parent link ends the chain instead of looping
+	st.Kids[0].Parent = "leo"
+	if len(e("2026-10-13 15:30").chain(sam)) != 3 {
+		t.Error("chain must stop at a loop")
+	}
+}

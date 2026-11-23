@@ -199,6 +199,7 @@ legend { font-weight: 700; padding: 0 4px; }
 }
 .rule-list tbody tr.sel td { background: var(--accent-soft); }
 .rule-list tbody tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.rule-list tbody tr.inherited td { color: var(--muted); }
 .rule-list .fallback-row td { color: var(--muted); border-bottom: 0; }
 .linkish { font: inherit; font-weight: 700; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .linkish:hover { text-decoration: underline; }
@@ -304,13 +305,36 @@ const toHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m
 const fromHHMM = (s) => { const [a, b] = s.split(":").map(Number); return a * 60 + b; };
 const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const kidById = (id) => state.kids.find((k) => k.id === id);
+// Profiles form a tree (kid.parent; missing = top level), at most MAX_DEPTH levels. A profile
+// follows its own settings first, then those of the profiles above it (DESIGN §1).
+const MAX_DEPTH = 4;
+function chainOf(kid) {
+  const out = [kid]; let p;
+  while (out.length <= MAX_DEPTH && (p = kidById(out.at(-1).parent)) && !out.includes(p)) out.push(p);
+  return out;
+}
+const pausedBy = (kid) => chainOf(kid).find((p) => p.paused) || null;
+const safeFrom = (kid) => chainOf(kid).find((p) => p.safeSearch) || null;
+const subProfiles = (kid) => state.kids.filter((k) => (k.parent || "") === kid.id);
+const heightOf = (kid) => 1 + Math.max(0, ...subProfiles(kid).map(heightOf));
+// Depth-first, in saved order: [{ kid, depth }]
+function profileTree() {
+  const out = [];
+  const walk = (parent, depth) => { for (const k of state.kids) if ((k.parent || "") === parent && depth <= MAX_DEPTH) { out.push({ kid: k, depth }); walk(k.id, depth + 1); } };
+  walk("", 1);
+  return out;
+}
+const profiles = () => profileTree().map((x) => x.kid);
+const insideText = (kid) => kidById(kid.parent) ? `Inside ${chainOf(kid).slice(1).reverse().map((p) => p.name).join(" › ")}` : "";
+const profileOptions = (sel, keep = () => true) => profileTree().filter(({ kid }) => keep(kid)).map(({ kid, depth }) =>
+  `<option value="${kid.id}" ${kid.id === sel ? "selected" : ""}>${"\u00a0\u00a0\u00a0".repeat(depth - 1)}${esc(kid.name)}</option>`).join("");
 const groupById = (id) => state.groups.find((g) => g.id === id);
 const keyName = (key) => key === "internet" ? "Internet" : groupById(key)?.name ?? key;
 const memberLabel = (m) => m.kind === "service" ? CATALOG[m.id] ?? m.id : m.kind === "filter" ? m.label : m.id;
 const kidDevices = (kid) => state.devices.filter((d) => d.kid === kid.id);
 const online = (d) => d.online;
 const isNew = (d) => d.firstSeen > 0 && d.side === "wireless" && !d.kid && !d.name && !d.reviewed && d.lastSeen <= 10080;
-// A child's device with the same DHCP host name: likely the same device with a new address
+// A managed device with the same DHCP host name: likely the same device with a new address
 function lookalike(d) {
   const h = (d.host || "").toLowerCase();
   if (!h) return null;
@@ -361,11 +385,13 @@ function dateMatches(rule, date) {
     || (c.startsWith("kind:") && ents.some((e) => e.kind === c.slice(5)))
     || (c.startsWith("entry:") && ents.some((e) => e.id === c.slice(6))));
 }
+// Own rules first, then the parent's, and so on up
+const inheritedRules = (kid) => chainOf(kid).flatMap((p) => p.rules.map((rule) => ({ rule, from: p })));
 // First rule (top to bottom) whose sites, weekday and dates all match
 function matchRule(kid, key, date) {
-  const dow = date.getDay();
-  const i = kid.rules.findIndex((r) => r.sites.includes(key) && r.days[dow] !== undefined && dateMatches(r, date));
-  return i < 0 ? null : { rule: kid.rules[i], n: i + 1 };
+  const dow = date.getDay(), all = inheritedRules(kid);
+  const i = all.findIndex(({ rule: r }) => r.sites.includes(key) && r.days[dow] !== undefined && dateMatches(r, date));
+  return i < 0 ? null : { rule: all[i].rule, n: i + 1, from: all[i].from };
 }
 const windowsFor = (kid, key, date) => { const m = matchRule(kid, key, date); return m ? m.rule.days[date.getDay()] : [[0, 1440]]; };
 // "open" / "closed" when the next two weeks are all-day open or fully blocked, else null
@@ -375,23 +401,32 @@ function constantRule(kid, key) {
   if (days.every((w) => w.length === 1 && w[0][0] === 0 && w[0][1] >= 1440)) return "open";
   return null;
 }
-// --- Exceptions: temporary allow/block for one child, outside the rule list ---------------------
-// Active from "from" until "until"; once "until" passes it no longer exists. Newest wins on overlap.
+// --- Exceptions: temporary allow/block for one profile, outside the rule list -------------------
+// Active from "from" until "until"; once "until" passes it no longer exists. The nearest profile
+// with one wins (own, then the profiles above); within a profile the newest wins.
 const liveExceptions = () => state.exceptions.filter((x) => x.until > Date.now());
 function activeException(kid, key, at = Date.now()) {
-  return liveExceptions().filter((x) => x.kid === kid.id && x.sites.includes(key) && x.from <= at).at(-1) || null;
+  for (const p of chainOf(kid)) {
+    const x = liveExceptions().filter((x) => x.kid === p.id && x.sites.includes(key) && x.from <= at).at(-1);
+    if (x) return x;
+  }
+  return null;
 }
 function status(kid, key) {
   const now = nowDate(), t = minsNow();
-  if (kid.paused) return { cls: "stop", label: "Paused", why: "All internet paused by a parent" };
+  const pb = pausedBy(kid);
+  if (pb) return { cls: "stop", label: "Paused", why: `All internet paused by a parent${pb !== kid ? ` (on ${pb.name})` : ""}` };
   if (key !== "internet") {
     const net = status(kid, "internet");
     if (net.cls === "stop") return { cls: "stop", label: "Blocked, internet is off", why: `Internet: ${net.label}` };
   }
   const ex = activeException(kid, key);
-  if (ex) return ex.open ? { cls: "temp", label: `Open until ${fmtDate(new Date(ex.until))}`, why: `Exception${ex.note ? ": " + ex.note : ""}` }
-                         : { cls: "stop", label: `Blocked until ${fmtDate(new Date(ex.until))}`, why: `Exception${ex.note ? ": " + ex.note : ""}` };
-  const m = matchRule(kid, key, now), why = m ? `Rule ${m.n}: ${m.rule.name}` : "No rule matches, allowed by default";
+  if (ex) {
+    const why = `Exception${ex.kid !== kid.id ? ` for ${kidById(ex.kid)?.name}` : ""}${ex.note ? ": " + ex.note : ""}`;
+    return ex.open ? { cls: "temp", label: `Open until ${fmtDate(new Date(ex.until))}`, why } : { cls: "stop", label: `Blocked until ${fmtDate(new Date(ex.until))}`, why };
+  }
+  const m = matchRule(kid, key, now);
+  const why = m ? `Rule ${m.n}: ${m.rule.name}${m.from !== kid ? ` (from ${m.from.name})` : ""}` : "No rule matches, allowed by default";
   const wins = windowsFor(kid, key, now);
   const cur = wins.find(([a, b]) => t >= a && t < b);
   if (cur) return { cls: "ok", label: cur[1] >= 1440 ? "Open all day" : `Open until ${fmt(cur[1])}`, why };
@@ -408,7 +443,7 @@ function status(kid, key) {
 let toastTimer;
 function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.hidden = true), 2600); }
 
-// One exception per child: a new one replaces whatever that child had. Returns true if it replaced one.
+// One exception per profile: a new one replaces whatever that profile had. Returns true if it replaced one.
 function addException(kidId, sites, open, from, until, note = "") {
   const replaced = liveExceptions().some((x) => x.kid === kidId);
   state.exceptions = state.exceptions.filter((x) => x.kid !== kidId);
@@ -428,7 +463,7 @@ function override(kidId, key, open, minutes) {
   toast(`${keyName(key)} ${open ? "opened" : "blocked"} for ${kid.name} until ${fmtDate(until)}${replaced ? " (replaced the earlier exception)" : ""}`);
   render();
 }
-// "Back to schedule": end every live exception of this child that covers this group
+// "Back to schedule": end every live exception of this profile that covers this group
 function clearOverride(kidId, key) {
   const kid = kidById(kidId), now = Date.now();
   state.exceptions = state.exceptions.filter((x) => !(x.kid === kidId && x.sites.includes(key) && x.from <= now));
@@ -443,18 +478,20 @@ function renderTabs() {
 
 function scheduledBlock(kid, key) {
   const s = status(kid, key);
-  const hasOv = !!activeException(kid, key);
-  const isNet = key === "internet";
+  const hasOv = activeException(kid, key)?.kid === kid.id;   // only its own exception can be ended here
+  const isNet = key === "internet", pb = pausedBy(kid);
   let acts;
-  if (isNet) acts = kid.paused
+  if (isNet) acts = pb && pb !== kid
+    ? `<button class="btn primary" data-act="resume" data-kid="${pb.id}">Resume ${esc(pb.name)}</button>`
+    : kid.paused
     ? `<button class="btn primary" data-act="resume" data-kid="${kid.id}">Resume internet</button>`
-    : `<button class="btn danger" data-act="pause" data-kid="${kid.id}">Pause all internet</button>`;
-  else if (kid.paused) acts = "";
+    : `<button class="btn danger" data-act="pause" data-kid="${kid.id}">Pause all internet${subProfiles(kid).length ? ` for ${esc(kid.name)}` : ""}</button>`;
+  else if (pb) acts = "";
   else if (s.cls === "ok" || s.cls === "temp") acts = `<button class="btn" data-act="block" data-kid="${kid.id}" data-key="${key}">Block now</button>`;
   else acts = `<button class="btn" data-act="open" data-min="30" data-kid="${kid.id}" data-key="${key}">Open 30 min</button>
                <button class="btn" data-act="open" data-min="60" data-kid="${kid.id}" data-key="${key}">Open 1 hour</button>
                <button class="btn" data-act="open" data-min="tonight" data-kid="${kid.id}" data-key="${key}">Open until 9 PM</button>`;
-  if (hasOv && !kid.paused) acts += `<button class="btn" data-act="clear" data-kid="${kid.id}" data-key="${key}">Back to schedule</button>`;
+  if (hasOv && !pb) acts += `<button class="btn" data-act="clear" data-kid="${kid.id}" data-key="${key}">Back to schedule</button>`;
   const members = isNet ? "" : `<div class="why">${groupById(key).members.map(memberLabel).map(esc).join(", ")}</div>`;
   return `<div class="svc">
     <div class="svc-line"><span class="svc-name">${esc(keyName(key))}</span><span class="pill ${s.cls}">${s.label}</span></div>
@@ -465,16 +502,16 @@ function scheduledBlock(kid, key) {
 function viewToday() {
   const ents = entriesOn(nowDate());
   if (!state.kids.length) return `<section class="panel empty"><h2>Welcome</h2>
-    <p class="note">Start by adding your children. Each child gets their own rules on the Schedules tab.</p>
-    <button class="btn primary" data-act="addkid">Add a child</button></section>`;
+    <p class="note">Start by adding a profile for each child. A profile can also hold other profiles (for example “Kids” with each child inside), so its rules cover all of them.</p>
+    <button class="btn primary" data-act="addkid">Add a profile</button></section>`;
   return `${newDevicesHint()}${districtNotices(false)}${syncPanel()}<p class="note">Today is ${ents.length ? `<b>${ents.map((e) => esc(e.name)).join(", ")}</b> on the calendar` : "a regular day on the calendar"}.</p>
-  <div class="kids">${state.kids.map((kid) => {
+  <div class="kids">${profiles().map((kid) => {
     const sched = state.groups.filter((g) => !constantRule(kid, g.id));
     const fixed = state.groups.filter((g) => constantRule(kid, g.id));
     return `<section class="kid" aria-label="${esc(kid.name)}">
       <div class="kid-head">
         <div class="avatar" style="background:${kid.color}">${esc(kid.name[0])}</div>
-        <div><h2>${esc(kid.name)}</h2><div class="muted small">${kid.safeSearch ? "Safe search on" : "Safe search off"}</div></div>
+        <div><h2>${esc(kid.name)}</h2><div class="muted small">${[insideText(kid), safeFrom(kid) ? `Safe search on${safeFrom(kid) !== kid ? ` (from ${esc(safeFrom(kid).name)})` : ""}` : "Safe search off"].filter(Boolean).map(esc).join(" · ")}</div></div>
         <div class="devs muted small">${kidDevices(kid).length} devices<br>${kidDevices(kid).filter(online).length} online</div>
       </div>
       ${kidSyncLine(kid)}
@@ -491,17 +528,17 @@ const LENGTHS = { 30: "30 minutes", 60: "1 hour", 120: "2 hours", 180: "3 hours"
 const exSummary = (x) => `${x.open ? "Allow" : "Block"} ${x.sites.map(siteLabel).join(", ")}`;
 
 function viewExceptions() {
-  if (!state.kids.length) return `<section class="panel"><p class="note">Add a child on the Schedules tab first.</p></section>`;
+  if (!state.kids.length) return `<section class="panel"><p class="note">Add a profile on the Schedules tab first.</p></section>`;
   const rows = liveExceptions().filter((x) => x.from <= Date.now());
   return `<section class="panel">
     <h2>Active now</h2>
-    ${rows.length ? `<div class="scroll"><table><thead><tr><th>Child</th><th>Exception</th><th>Until</th><th>Note</th><th></th></tr></thead><tbody>
+    ${rows.length ? `<div class="scroll"><table><thead><tr><th>Profile</th><th>Exception</th><th>Until</th><th>Note</th><th></th></tr></thead><tbody>
       ${rows.map((x) => `<tr><td><b>${esc(kidById(x.kid)?.name ?? "?")}</b></td>
         <td><span class="pill ${x.open ? "ok" : "stop"}">${x.open ? "Allow" : "Block"}</span> ${x.sites.map((s) => esc(siteLabel(s))).join(", ")}</td>
         <td class="mono small">${fmtDate(new Date(x.until))} <span class="muted">· ${left(x.until)}</span></td>
         <td class="small">${esc(x.note || "")}</td>
         <td><button class="btn danger" data-delex="${x.id}">End now</button></td></tr>`).join("")}
-    </tbody></table></div>` : `<p class="note">No exceptions running. Each child can have one at a time.</p>`}
+    </tbody></table></div>` : `<p class="note">No exceptions running. Each profile can have one at a time.</p>`}
   </section>
   <section class="panel">
     <h2>Favorites</h2>
@@ -514,10 +551,10 @@ function viewExceptions() {
   </section>
   <section class="panel">
     <h2>Add an exception</h2>
-    <p class="note">Starts now and wins over the rules while it lasts. A new exception replaces the child's current one. It cannot open sites while that child's Internet is off; include Internet to change that too.</p>
+    <p class="note">Starts now and wins over the rules while it lasts. A new exception replaces the profile's current one. An exception on a profile that holds others (e.g. “Kids”) applies to everyone inside it, but a profile's own exception wins over it. It cannot open sites while Internet is off; include Internet to change that too.</p>
     <form class="ex-form" id="exform">
       <div class="form">
-        <label>Child<select id="x-kid">${state.kids.map((k) => `<option value="${k.id}">${esc(k.name)}</option>`).join("")}</select></label>
+        <label>Profile<select id="x-kid">${profileOptions(null)}</select></label>
         <fieldset class="inline"><legend>Action</legend>
           <label class="pick"><input type="radio" name="x-act" value="allow" checked> Allow</label>
           <label class="pick"><input type="radio" name="x-act" value="block"> Block</label></fieldset>
@@ -551,7 +588,7 @@ function submitException() {
   render();
 }
 
-// --- Schedules: one child's rule list ----------------------------------------------------------
+// --- Schedules: one profile's rule list, followed by the rules it inherits ----------------------
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 const TICKS = [0, 6, 12, 18, 24].map((x) => `<span style="left:${x / 24 * 100}%">${x === 0 || x === 24 ? "12a" : x === 12 ? "12p" : x < 12 ? x + "a" : (x - 12) + "p"}</span>`).join("");
 const bar = (wins, nowAt) => `<div class="tl-bar">${(wins || []).map(([a, b]) =>
@@ -585,6 +622,16 @@ function ruleList(kid) {
       <td><div class="actions nowrap">
         <button class="btn" data-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(r.name)} up">↑</button>
         <button class="btn" data-down="${i}" ${i === kid.rules.length - 1 ? "disabled" : ""} aria-label="Move ${esc(r.name)} down">↓</button></div></td>
+    </tr>`).join("")}
+    ${inheritedRules(kid).slice(kid.rules.length).map(({ rule: r, from }, j) => `<tr class="inherited">
+      <td class="mono">${kid.rules.length + j + 1}</td>
+      <td><button class="linkish" data-goto="${from.id}" data-gorule="${r.id}" title="Open ${esc(from.name)}'s rules">${esc(r.name)}</button>
+        <div class="small">From ${esc(from.name)}</div>
+        ${appliesNow(kid, r) ? `<div><span class="pill temp">Applies now</span></div>` : ""}</td>
+      <td>${r.dates.map((c) => esc(dateLabel(c))).join(", ")}</td>
+      <td>${r.sites.map((s) => esc(siteLabel(s))).join(", ")}</td>
+      <td class="small">${esc(daysSummary(r))}</td>
+      <td></td>
     </tr>`).join("")}
     <tr class="fallback-row"><td class="mono">·</td><td><b>No rule matches</b></td><td colspan="4" class="muted small">Allowed. Sites and days not covered by any rule above stay open.</td></tr>
   </tbody></table></div>`;
@@ -662,36 +709,46 @@ function ruleEditor(kid) {
 
 const COLORS = ["#3f7d6e", "#7a5aa6", "#b5532f", "#2b6cb0", "#a23d6d", "#6b7a1f", "#4d5b70"];
 function kidEditor() {
-  const k = state.kidForm, old = kidById(k.id);
+  const k = state.kidForm, old = kidById(k.id), h = old ? heightOf(old) : 1;
+  // A profile can't go inside itself or one of its own sub-profiles, nor below MAX_DEPTH levels
+  const fits = (p) => !(old && chainOf(p).includes(old)) && chainOf(p).length + h <= MAX_DEPTH;
   return `<form class="panel" id="kidform">
-    <h2>${old ? "Edit " + esc(old.name) : "Add a child"}</h2>
-    <div class="form"><label>Name<input id="k-name" value="${esc(k.name)}" maxlength="40" required></label></div>
+    <h2>${old ? "Edit " + esc(old.name) : "Add a profile"}</h2>
+    <div class="form"><label>Name<input id="k-name" value="${esc(k.name)}" maxlength="40" required></label>
+      <label>Inside<select id="k-parent"><option value="">Nothing (top level)</option>${profileOptions(k.parent, fits)}</select></label></div>
+    <p class="note">A profile inside another one follows that profile's rules too: its own rules come first, then the rules of the profile it is inside. Pausing or an exception on the outer profile reaches every profile inside it.</p>
     <div class="swatches" role="group" aria-label="Color">${COLORS.map((c) => `<button type="button" class="swatch" style="background:${c}" data-color="${c}" aria-pressed="${k.color === c}" aria-label="Color ${c}"></button>`).join("")}</div>
     <label class="pick" style="justify-self:start"><input type="checkbox" id="k-safe" ${k.safeSearch ? "checked" : ""}> Safe search on Google, Bing and YouTube</label>
     <div class="actions">
-      <button class="btn primary">${old ? "Save" : "Add child"}</button>
+      <button class="btn primary">${old ? "Save" : "Add profile"}</button>
       <button type="button" class="btn" data-act="cancelkid">Cancel</button>
-      ${old ? `<button type="button" class="btn danger" data-act="delkid">${k.confirmDelete ? "Click again to delete " + esc(old.name) : "Delete child"}</button>` : ""}
+      ${old ? `<button type="button" class="btn danger" data-act="delkid">${k.confirmDelete ? "Click again to delete " + esc(old.name) : "Delete profile"}</button>` : ""}
     </div>
-    ${old && k.confirmDelete ? `<p class="note">Deletes their rules, exception and favorites. Their devices become unmanaged.</p>` : ""}
+    ${old && k.confirmDelete ? `<p class="note">Deletes its rules, exception and favorites. ${kidById(old.parent) ? `Its devices${subProfiles(old).length ? " and the profiles inside it" : ""} move to ${esc(kidById(old.parent).name)}.` : `Its devices become unmanaged${subProfiles(old).length ? "; the profiles inside it move to the top level" : ""}.`}</p>` : ""}
   </form>`;
+}
+
+function readKidForm() {
+  const kf = state.kidForm; if (!kf || !document.getElementById("kidform")) return;
+  kf.name = $("#k-name").value; kf.safeSearch = $("#k-safe").checked; kf.parent = $("#k-parent").value;
 }
 
 function viewSchedule() {
   const kid = kidById(state.schedKid);
   const editing = state.draft;
   if (state.kidForm) return kidEditor();
-  if (!kid) return `<section class="panel empty"><h2>No children yet</h2>
-    <p class="note">Add each child, then give them rules here and assign their devices on the Devices tab.</p>
-    <button class="btn primary" data-act="addkid">Add a child</button></section>`;
+  if (!kid) return `<section class="panel empty"><h2>No profiles yet</h2>
+    <p class="note">Add a profile for each child, then give it rules here and assign devices on the Devices tab. To manage several children together, add a profile such as “Kids” and put the children's profiles inside it.</p>
+    <button class="btn primary" data-act="addkid">Add a profile</button></section>`;
   return `<section class="panel">
     <div class="toolbar">
-      <div class="seg" role="group" aria-label="Child">${state.kids.map((k) => `<button aria-pressed="${k.id === kid.id}" data-skid="${k.id}">${esc(k.name)}</button>`).join("")}</div>
+      <label class="small">Profile <select id="s-kid">${profileOptions(kid.id)}</select></label>
       ${editing ? "" : `<button class="btn primary" data-act="addrule">Add rule</button>
         <button class="btn" data-act="editkid">Edit ${esc(kid.name)}</button>
-        <button class="btn" data-act="addkid">Add child</button>`}
+        <button class="btn" data-act="addkid">Add profile</button>`}
     </div>
-    <p class="note">Rules are checked from the top. For each site group, the first rule whose dates, weekday and sites all match decides when it is allowed. When Internet is blocked, every site is blocked. Pick a rule to see its details below.</p>
+    ${insideText(kid) ? `<p class="small muted">${esc(insideText(kid))}</p>` : ""}
+    <p class="note">Rules are checked from the top. For each site group, the first rule whose dates, weekday and sites all match decides when it is allowed. When Internet is blocked, every site is blocked. ${kidById(kid.parent) ? "The greyed rules come from the profiles this one is inside; its own rules come first, so they win. " : ""}Pick a rule to see its details below.</p>
     ${ruleList(kid)}
   </section>
   ${(() => {
@@ -723,7 +780,7 @@ function readDraft() {
 function viewGroups() {
   const options = Object.entries(CATALOG).map(([id, l]) => `<option value="${esc(l)}"></option>`).join("");
   return `<datalist id="catalog">${options}</datalist>
-  <p class="note">A group bundles services and websites so one rule covers all of them. Rules on the Schedules tab decide when each group is allowed for each child.</p>
+  <p class="note">A group bundles services and websites so one rule covers all of them. Rules on the Schedules tab decide when each group is allowed for each profile.</p>
   <div class="groups">${state.groups.map((g) => `<section class="panel" aria-label="${esc(g.name)}">
     <div class="svc-line" style="justify-content:space-between"><h2>${esc(g.name)}</h2>
       <button class="btn danger" data-delgroup="${g.id}">Delete group</button></div>
@@ -855,17 +912,17 @@ function viewDevices() {
         ${d.side === "other" && d.kid ? `<div><span class="chip warn">Not behind the CM4: rules can't apply</span></div>` : ""}`;
   return `<section class="panel">
     <h2>Devices</h2>
-    <p class="note">Assign each device to a child so their rules apply. Children's and named devices always stay listed; others show if seen in the last 7 days. Click a name to rename it. Phones and tablets must have “Private Wi-Fi address” turned off.</p>
+    <p class="note">Assign each device to a profile so its rules apply. Children's and named devices always stay listed; others show if seen in the last 7 days. Click a name to rename it. Phones and tablets must have “Private Wi-Fi address” turned off.</p>
     ${fresh.length ? `<div class="banner"><b>${fresh.length} new device${fresh.length > 1 ? "s" : ""} on the Wi-Fi</b> (listed first).
-      A child's device shows up here as new when its address changes, for example when “Private Wi-Fi address” is turned back on. Assign it to the child, or mark it as not a child's device.
+      A child's device shows up here as new when its address changes, for example when “Private Wi-Fi address” is turned back on. Assign it to the child's profile, or mark it as not a child's device.
       <div><button class="btn" data-act="reviewall">Mark all ${fresh.length} as not a child's device</button></div></div>` : ""}
-    ${behind ? "" : `<div class="banner">The wireless hub is not behind the CM4 yet, so every device shows as “Home network”. You can already name devices and assign them to children.</div>`}
+    ${behind ? "" : `<div class="banner">The wireless hub is not behind the CM4 yet, so every device shows as “Home network”. You can already name devices and assign them to profiles.</div>`}
     <div class="scroll"><table class="devices"><thead><tr><th>Device</th><th>Belongs to</th><th>IP</th><th>MAC</th><th>Network</th><th>Last seen</th><th></th></tr></thead><tbody>
       ${visible.map((d) => `<tr>
         <td>${nameCell(d)}</td>
         <td><select aria-label="Assign ${esc(devName(d))}" data-assign="${esc(d.id)}">
           <option value="" ${d.kid ? "" : "selected"}>Not managed</option>
-          ${state.kids.map((k) => `<option value="${k.id}" ${d.kid === k.id ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select></td>
+          ${profileOptions(d.kid)}</select></td>
         <td class="mono">${esc(d.ip || "–")}</td><td class="mono">${esc(d.mac)}</td>
         <td class="small">${d.side === "wireless" ? "Wireless (behind the CM4)" : d.side === "other" ? "Home network" : "–"}</td>
         <td>${online(d) ? `<span class="chip">Online</span>` : `<span class="muted small">${d.lastSeen === Infinity ? "not seen" : ago(d.lastSeen)}</span>`}</td>
@@ -914,7 +971,7 @@ function applyServer(data) {
   const stored = new Map((data.devices || []).map((d) => [d.mac, d]));
   for (const d of state.devices) { const sd = stored.get(d.mac); d.name = sd?.name || ""; d.kid = sd?.kid || null; d.reviewed = !!sd?.reviewed; stored.delete(d.mac); }
   for (const sd of stored.values()) state.devices.push(liveDevice({ mac: sd.mac, name: sd.name, kid: sd.kid, reviewed: sd.reviewed }));
-  if (!kidById(state.schedKid)) { state.schedKid = state.kids[0]?.id ?? null; state.selRule = null; state.draft = null; }
+  if (!kidById(state.schedKid)) { state.schedKid = profiles()[0]?.id ?? null; state.selRule = null; state.draft = null; }
   const kid = kidById(state.schedKid);
   if (kid && !kid.rules.some((r) => r.id === state.selRule)) state.selRule = kid.rules[0]?.id ?? null;
   savedJSON = dataJSON();
@@ -1014,11 +1071,11 @@ function syncPanel() {
     <p class="note">The CM4 re-checks the rules every minute and right after each change. Blocked sites stop resolving within about a minute; a video that is already playing may continue until the app reconnects.</p>
   </section>`;
 }
-// What the CM4 enforces for this child right now (from the last sync)
+// What the CM4 enforces for this profile's own devices right now (from the last sync)
 function kidSyncLine(kid) {
   const k = state.sync?.kids?.find((x) => x.id === kid.id);
   if (!k) return "";
-  if (!k.devices) return `<div class="why">No devices assigned yet: assign them on the Devices tab.</div>`;
+  if (!k.devices) return `<div class="why">${subProfiles(kid).length ? `No devices of its own. Its rules reach the profiles inside it.` : "No devices assigned yet: assign them on the Devices tab."}</div>`;
   const what = k.internetBlocked ? "internet off" : k.blockedGroups.length ? "blocking " + k.blockedGroups.map(siteLabel).join(", ") : "nothing blocked";
   const parts = [k.client ? `${esc(k.client)} (${k.ips.length} IP${k.ips.length > 1 ? "s" : ""}): ${esc(what)}` : "No device IP known yet, nothing applied"];
   if (k.notBehind) parts.push(`${k.notBehind} of ${k.devices} device${k.devices > 1 ? "s" : ""} not behind the CM4`);
@@ -1080,22 +1137,23 @@ document.addEventListener("click", (e) => {
   const ds = b.dataset, kid = kidById(state.schedKid);
   if (ds.tab) { state.tab = ds.tab; state.draft = null; state.kidForm = null; state.renaming = null; render(); if (ds.tab === "devices") loadDevices(); return; }
   if (ds.act === "logout") { api("POST", "/api/logout").finally(() => (location.href = "/login")); return; }
-  if (ds.act === "addkid") { state.tab = "schedule"; state.draft = null; state.kidForm = { id: "k" + Date.now().toString(36), name: "", color: COLORS[state.kids.length % COLORS.length], safeSearch: true }; render(); return; }
-  if (ds.act === "editkid") { const k = kidById(state.schedKid); state.kidForm = { id: k.id, name: k.name, color: k.color, safeSearch: k.safeSearch }; render(); return; }
+  if (ds.act === "addkid") { state.tab = "schedule"; state.draft = null; state.kidForm = { id: "k" + Date.now().toString(36), name: "", parent: "", color: COLORS[state.kids.length % COLORS.length], safeSearch: true }; render(); return; }
+  if (ds.act === "editkid") { const k = kidById(state.schedKid); state.kidForm = { id: k.id, name: k.name, parent: k.parent || "", color: k.color, safeSearch: k.safeSearch }; render(); return; }
   if (ds.act === "cancelkid") { state.kidForm = null; render(); return; }
-  if (ds.color) { state.kidForm.name = $("#k-name").value; state.kidForm.safeSearch = $("#k-safe").checked; state.kidForm.color = ds.color; render(); return; }
+  if (ds.color) { readKidForm(); state.kidForm.color = ds.color; render(); return; }
   if (ds.act === "delkid") {
     const kf = state.kidForm;
-    if (!kf.confirmDelete) { kf.name = $("#k-name").value; kf.safeSearch = $("#k-safe").checked; kf.confirmDelete = true; render(); return; }
-    const k = kidById(kf.id);
+    if (!kf.confirmDelete) { readKidForm(); kf.confirmDelete = true; render(); return; }
+    // Sub-profiles and devices move up one level
+    const k = kidById(kf.id), up = k.parent || "";
     state.kids = state.kids.filter((x) => x !== k);
+    state.kids.forEach((x) => { if ((x.parent || "") === k.id) { if (up) x.parent = up; else delete x.parent; } });
     state.exceptions = state.exceptions.filter((x) => x.kid !== k.id);
     state.favorites = state.favorites.filter((x) => x.kid !== k.id);
-    state.devices.forEach((d) => { if (d.kid === k.id) d.kid = null; });
-    state.kidForm = null; state.schedKid = state.kids[0]?.id ?? null; state.selRule = kidById(state.schedKid)?.rules[0]?.id ?? null;
+    state.devices.forEach((d) => { if (d.kid === k.id) d.kid = up || null; });
+    state.kidForm = null; state.schedKid = up || profiles()[0]?.id || null; state.selRule = kidById(state.schedKid)?.rules[0]?.id ?? null;
     toast(`${k.name} deleted`); render(); return;
   }
-  if (ds.skid) { state.schedKid = ds.skid; state.draft = null; state.selRule = kidById(ds.skid).rules[0]?.id ?? null; render(); return; }
   if (ds.selrule) { if (state.draft) readDraft(); state.draft = null; state.selRule = ds.selrule; render(); return; }
   if (ds.opendev) { state.openDevice = ds.opendev; loadActivity(); return; }
   if (ds.rename) { state.renaming = ds.rename; render(); document.getElementById("rn-" + ds.rename)?.focus(); return; }
@@ -1108,7 +1166,7 @@ document.addEventListener("click", (e) => {
     state.exceptions = state.exceptions.filter((y) => y !== x); toast(live ? "Exception ended" : "Exception deleted"); render(); return; }
   if (ds.range) { state.range = Number(ds.range); loadActivity(); return; }
   if (ds.act === "alldev") { state.showAllDevices = !state.showAllDevices; render(); return; }
-  if (ds.goto) { Object.assign(state, { tab: "schedule", schedKid: ds.goto, draft: null, selRule: kidById(ds.goto).rules[0]?.id ?? null }); render(); return; }
+  if (ds.goto) { Object.assign(state, { tab: "schedule", schedKid: ds.goto, draft: null, selRule: ds.gorule || (kidById(ds.goto).rules[0]?.id ?? null) }); render(); return; }
 
   // Rule list
   if (ds.up !== undefined || ds.down !== undefined) {
@@ -1165,6 +1223,7 @@ document.addEventListener("click", (e) => {
 
 document.addEventListener("change", (e) => {
   if (e.target.id === "sys") { state.showSystem = e.target.checked; render(); return; }
+  if (e.target.id === "s-kid") { state.schedKid = e.target.value; state.draft = null; state.selRule = kidById(state.schedKid).rules[0]?.id ?? null; render(); return; }
   if (e.target.classList.contains("r-day")) { readDraft(); render(); return; }
   const et = e.target.dataset?.entryto;
   if (et) {
@@ -1188,11 +1247,14 @@ document.addEventListener("submit", (e) => {
     toast(name ? `Renamed to ${name}` : "Name cleared"); render(); return;
   }
   if (f.id === "kidform") {
-    const kf = state.kidForm, name = $("#k-name").value.trim(), safe = $("#k-safe").checked;
+    readKidForm();
+    const kf = state.kidForm, name = kf.name.trim(), safe = kf.safeSearch;
     if (!name) return toast("Enter a name");
     const k = kidById(kf.id);
     if (k) Object.assign(k, { name, color: kf.color, safeSearch: safe });
     else state.kids.push({ id: kf.id, name, color: kf.color, safeSearch: safe, paused: false, rules: [] });
+    const nk = kidById(kf.id);
+    if (kf.parent) nk.parent = kf.parent; else delete nk.parent;
     state.kidForm = null; state.schedKid = kf.id; state.selRule = kidById(kf.id).rules[0]?.id ?? null;
     toast(k ? `${name} saved` : `${name} added. Add rules here, then assign devices on the Devices tab.`); render(); return;
   }
